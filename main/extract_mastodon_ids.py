@@ -1,6 +1,8 @@
 import re
 import tweepy
 
+forbidden_hosts = {'tiktok.com', 'www.tiktok.com'}
+
 # Matches anything of the form @foo@bar.bla or foo@bar.social or foo@social.bar or foo@barmastodonbla
 # We do not match everything of the form foo@bar or foo@bar.bla to avoid false positives like email addresses
 _id_pattern1 = re.compile(r'(@[^\s(),:;#<>&]+@[^\s():;#]+\.[^\s(),:;#<>&]+|[^\s(),:;#<>&]+@[^\s(),:;#<>&]+\.social|[^\s(),:;#<>&]+@social\.[^\s(),:;#<>&]+|[^\s(),:;#<>&]+@[^\s(),:;#<>&]*mastodon[^\s(),:;#<>&]+)', re.IGNORECASE)
@@ -54,6 +56,10 @@ def extract_urls(u):
         aux(u.entities['description']['urls'])
     return results
 
+def make_mastodon_id(u, h):
+    if h in forbidden_hosts: return None
+    return MastodonID(u, h)
+
 # client: a tweepy.Client object
 # requested_user: a tweepy.User object
 # returns:
@@ -89,11 +95,11 @@ def extract_mastodon_ids(client, requested_user):
             mastodon_ids1 = [mid for s in _id_pattern1.findall(screenname) + _id_pattern1.findall(bio)
                                  if (mid := parse_mastodon_id(s)) is not None]
             for url in extract_urls(u):
-                if screenname == 'janboehm': print(url)
-                for _, h, u, _ in _id_pattern2.findall(url):
-                    mastodon_ids1.append(MastodonID(u, h))
+                for _, h_str, u_str, _ in _id_pattern2.findall(url):
+                    mid = make_mastodon_id(u_str, h_str)
+                    if mid is not None: mastodon_ids1.append(mid)
                                  
-            mastodon_ids2 = [MastodonID(u, h) for _, h, u, _ in _id_pattern2.findall(screenname) + _id_pattern2.findall(bio)]
+            mastodon_ids2 = [x for _, h_str, u_str, _ in _id_pattern2.findall(screenname) + _id_pattern2.findall(bio) if (x := make_mastodon_id(u_str, h_str)) is not None]
             mastodon_ids = list(set(mastodon_ids1).union(set(mastodon_ids2)))
             extras = None
             
