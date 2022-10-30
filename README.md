@@ -6,12 +6,12 @@ This is a simple (and experimental) web app that uses the Twitter API to find ou
 A CSV export for import into Mastodon is also provided.
 
 
-## Canonical instance
+### Canonical instance
 
-An experimental canonical instance of this is hosted on (https://pruvisto.org/debirdify).
+An experimental canonical instance of this is hosted on https://pruvisto.org/debirdify.
 
 
-## Implementation
+### Implementation
 
 This project uses Django and Python. Configuration of things like the callback URL and API keys and secrets is done with WSGI environment variables (set them e.g. with SetVar in your webserver configuration).
 
@@ -20,7 +20,7 @@ The Twitter authentication information is stored in a cookie for 7 days so that 
 The logical core of the implementation is in `main/extract_mastodon_ids.py`. Using this, you can also create a standalone application to find Mastodon IDs in account bios/names.
 
 
-## Configuration
+### Configuration
 
 Environment variables being used are:
   - `DEBIRDIFY_ALLOWED_HOSTS`: a list of hosts the server will accept in the format `['host1', 'host2']`
@@ -30,7 +30,7 @@ Environment variables being used are:
   - `DEBIRDIFY_DEBUG` (0 or 1): whether Django should run in debug mode (absolutely switch this off for production use)
 
 
-## Caveats
+### Caveats
 
 The current implementation only looks at the first 1000 followed accounts returned by Twitter. This could easily be extended to more, although Twitter does apply some fairly harsh rate limiting.
 
@@ -41,8 +41,8 @@ Also note that I am not very well-versed in Python and wrote this code in just a
 Note that if you use this software you will have to get a Twitter developer account, create your own app, get your own credentials etc. and are responsible for checking that the use of this software complies with Twitter's guidelines.
 
 
-## Contact
+### Contact
 
-If you have any questions or suggestions, contact (https://graz.social/@pruvisto)[@pruvisto@graz.social]. Pull requests are welcome, but I may be too busy to put too much work into this project. Forks/other instances of this are also very welcome.
+If you have any questions or suggestions, contact [https://graz.social/@pruvisto](@pruvisto@graz.social). Pull requests are welcome, but I may be too busy to put too much work into this project. Forks/other instances of this are also very welcome.
 
 
