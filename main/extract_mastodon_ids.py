@@ -1,13 +1,19 @@
 import re
 import tweepy
 
-forbidden_hosts = {'tiktok.com', 'www.tiktok.com', 'youtube.com', 'www.youtube.com', 'medium.com', 'www.medium.com', 'skeb.jp', 'pronouns.page', 'foundation.app', 'gamejolt.com'}
+_forbidden_hosts = {'tiktok.com', 'youtube.com', 'medium.com', 'skeb.jp', 'pronouns.page', 'foundation.app', 'gamejolt.com'}
 
 # Matches anything of the form @foo@bar.bla or foo@bar.social or foo@social.bar or foo@barmastodonbla
 # We do not match everything of the form foo@bar or foo@bar.bla to avoid false positives like email addresses
 _id_pattern1 = re.compile(r'(@[\w\-\.]+@[\w\-\.]+\.[\w\-\.]+|[\w\-\.]+@[\w\-\.]+\.social|[\w\-\.]+@social\.[\w\-\.]+|[\w\-\.]+@[\w\-\.]*mastodon[\w\-\.]+)', re.IGNORECASE)
 _id_pattern2 = re.compile(r'\b(http://|https://)?([\w\-\.]+\.[\w\-\.]+)/(web/)?@([\w\-\.]+)/?\b', re.IGNORECASE)
 _url_pattern = re.compile(r'^(http://|https://)([\w\-\.]+\.[\w\-\.]+)/(web/)?@([\w\-\.]+)/?$', re.IGNORECASE)
+
+def is_forbidden_host(h):
+    xs = h.lower().split('.')
+    for i in range(0, len(xs)):
+        if '.'.join(xs[i:]) in _forbidden_hosts: return True
+    return False
 
 # Matches some key words that might occur in bios
 _keyword_pattern = re.compile(r'.*(mastodon|toot|tröt).*', re.IGNORECASE)
@@ -64,7 +70,7 @@ def extract_urls(u):
     return results
 
 def make_mastodon_id(u, h):
-    if h.lower() in forbidden_hosts: return None
+    if is_forbidden_host(h): return None
     return MastodonID(u, h)
 
 # client: a tweepy.Client object
