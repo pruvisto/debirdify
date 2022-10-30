@@ -1,0 +1,111 @@
+{% load mid %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Debirdify</title>
+{% include "style.html" %}
+<style>
+.displayname {
+    font-weight: 700;
+}
+.screenname::before {
+    content: "@";
+}
+.screenname {
+    color: rgb(83, 100, 113);
+}
+a.twitter_acc_link {
+    text-decoration: none;
+    color: inherit;
+}
+dl.users {
+  margin-left: 1em;
+}
+dd.users {
+  margin-bottom: 1em;
+}
+ul.mids {
+  list-style-type: none;
+  text-indent: 0;
+  padding: 0;
+}
+ul.extras {
+  list-style-type: none;
+  text-indent: 0;
+  padding: 0;
+}
+</style>
+</head>
+<body>
+<h1>Debirdify</h1>
+
+<p>Check if the people somebody is following are on Mastodon.</p>
+<form action="./" method="get">
+<label for="screenname">Twitter handle:</label><br>
+<input type="text" id="screenname" name="screenname" value="@{% if is_me %}{{ me.username }}{% else %}{{ requested_name }}{% endif %}"><br>
+<input type="submit" value="Find Mastodon IDs">
+</form>
+
+<h2>Results</h2>
+
+{% if requested_user is none %}
+<p>There is no user called @{{requested_name}}.</p>
+{% else %}
+{% if mastodon_id_users or keyword_users %}
+<p>Good news! Some of the people {% if is_me %}you follow{% else %}@{{ requested_user.username }} follows{% endif %} seem to have a Mastodon account:</p>
+{% else %}
+<p>Sadly, none of the people {% if is_me %}<a href="https://twitter.com/{{ me.username }}">you</a> follow{% else %}<a href="https://twitter.com/{{ requested_user.username }}">@{{ requested_user.username }}</a> follows{% endif %} seem to have a Mastodon account.</p>
+{% endif %}
+
+
+{% if mastodon_id_users %}
+<p>The following users have something in their name or bio that looks like a Mastodon ID. (<a href="#export">see below for CSV export</a>)</p>
+<dl class="users">
+  {% for u in mastodon_id_users %}
+    <dt class="users"><a href="https://twitter.com/{{ u.screenname }}" class="twitter_acc_link"><span class="displayname">{{ u.name }}</span> <span class="screenname">{{ u.screenname }}</span></a></dt>
+    <dd class="users">
+      <ul class="mids">
+       {% for mid in u.mastodon_ids %}
+         <li class="mids"><a href="{{ mid|mid_url }}">{{ mid }}</a></li>
+       {% endfor %}
+      </ul>
+    </dd>
+  {% endfor %}
+</dl>
+
+
+<h2>CSV Export</h2>
+<p><a id="export"></a>You can bulk-follow all the above accounts on Mastodon by downloading the CSV file below and importing it on Mastodon under Settings → Import and Export → Import. Make sure to select ‘merge’, not ‘overwrite’.</p>
+<p style="margin-bottom: 2em">
+<a class="button" href="data:text/plain;charset=utf-8,{{ csv|urlencode }}" download="following_accounts.csv">Download CSV Export</a>
+</p>
+{% endif %}
+
+{% if keyword_users %}
+<h2>Additional Spurious Results</h2>
+
+<p>Additionally, the following users have some possibly Mastodon-related keywords in their bio. You may want to check them manually.</p>
+<dl class="users">
+  {% for u in keyword_users %}
+    <dt class="users"><a href="https://twitter.com/{{ u.screenname }}" class="twitter_acc_link"><span class="displayname">{{ u.name }}</span> <span class="screenname">{{ u.screenname }}</span></a></dt>
+    <dd class="users">
+      <ul class="extras">
+        {% for x in u.extras %}
+          <li class="extras">‘[…] {{ x }} […]’</li>
+        {% endfor %}
+      </ul>
+    </dd>
+  {% endfor %}
+</dl>
+{% endif %}
+
+{% endif %}
+
+<p style="margin-bottom: 2em; margin-top: 2em;">
+<a class="button" href="./?clear=clear">Log Out</a>
+</p>
+
+{% include "footer.html" %}
+</body>
+</html>
