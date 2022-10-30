@@ -1,12 +1,13 @@
 import re
 import tweepy
 
-forbidden_hosts = {'tiktok.com', 'www.tiktok.com', 'youtube.com', 'www.youtube.com', 'medium.com', 'www.medium.com'}
+forbidden_hosts = {'tiktok.com', 'www.tiktok.com', 'youtube.com', 'www.youtube.com', 'medium.com', 'www.medium.com', 'skeb.jp', 'pronouns.page', 'foundation.app', 'gamejolt.com'}
 
 # Matches anything of the form @foo@bar.bla or foo@bar.social or foo@social.bar or foo@barmastodonbla
 # We do not match everything of the form foo@bar or foo@bar.bla to avoid false positives like email addresses
-_id_pattern1 = re.compile(r'(@[^\s(),:;#<>&/]+@[^\s(),:;#<>&/]+\.[^\s(),:;#<>&/]+|[^\s(),:;#<>&/]+@[^\s(),:;#<>&/]+\.social|[^\s(),:;#<>&/]+@social\.[^\s(),:;#<>&/]+|[^\s(),:;#<>&/]+@[^\s(),:;#<>&/]*mastodon[^\s(),:;#<>&/]+)', re.IGNORECASE)
-_id_pattern2 = re.compile(r'\b(http://|https://)?([^\s(),:;#<>&/]+\.[^\s(),:;#<>&/]+)/@([^\s(),:;#<>&/]+)(/)?\b', re.IGNORECASE)
+_id_pattern1 = re.compile(r'(@[\w\-\.]+@[\w\-\.]+\.[\w\-\.]+|[\w\-\.]+@[\w\-\.]+\.social|[\w\-\.]+@social\.[\w\-\.]+|[\w\-\.]+@[\w\-\.]*mastodon[\w\-\.]+)', re.IGNORECASE)
+_id_pattern2 = re.compile(r'\b(http://|https://)?([\w\-\.]+\.[\w\-\.]+)/(web/)?@([\w\-\.]+)/?\b', re.IGNORECASE)
+_url_pattern = re.compile(r'^(http://|https://)([\w\-\.]+\.[\w\-\.]+)/(web/)?@([\w\-\.]+)/?$', re.IGNORECASE)
 
 # Matches some key words that might occur in bios
 _keyword_pattern = re.compile(r'.*(mastodon|toot|tröt).*', re.IGNORECASE)
@@ -95,14 +96,14 @@ def extract_mastodon_ids(client, requested_user):
             mastodon_ids1 = [mid for s in _id_pattern1.findall(screenname) + _id_pattern1.findall(bio)
                                  if (mid := parse_mastodon_id(s)) is not None]
             for url in extract_urls(u):
-                for _, h_str, u_str, _ in _id_pattern2.findall(url):
+                for _, h_str, _, u_str in _url_pattern.findall(url):
                     mid = make_mastodon_id(u_str, h_str)
                     if mid is not None: mastodon_ids1.append(mid)
-            for _, h_str, u_str, _ in _id_pattern2.findall(screenname):
+            for _, h_str, _, u_str in _id_pattern2.findall(screenname):
                 mid = make_mastodon_id(u_str, h_str)
                 if mid is not None: mastodon_ids1.append(mid)
                                  
-            mastodon_ids2 = [x for _, h_str, u_str, _ in _id_pattern2.findall(screenname) + _id_pattern2.findall(bio) if (x := make_mastodon_id(u_str, h_str)) is not None]
+            mastodon_ids2 = [x for _, h_str, _, u_str in _id_pattern2.findall(screenname) + _id_pattern2.findall(bio) if (x := make_mastodon_id(u_str, h_str)) is not None]
             mastodon_ids = list(set(mastodon_ids1).union(set(mastodon_ids2)))
             extras = None
             
