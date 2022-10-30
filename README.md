@@ -8,7 +8,7 @@ A CSV export for import into Mastodon is also provided.
 
 ## Canonical instance
 
-An experimental canonical instance of this is hosted on [https://pruvisto.org/debirdify].
+An experimental canonical instance of this is hosted on https://pruvisto.org/debirdify.
 
 
 ## Implementation
