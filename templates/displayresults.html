@@ -60,7 +60,7 @@ ul.extras {
 
 
 {% if mastodon_id_users %}
-<p>The following users have something in their name or bio that looks like a Mastodon ID. (<a href="#export">see below for CSV export</a>)</p>
+<p>Out of the {{ n_users_searched }} accounts you follow that we looked at, the following {% if mastodon_id_users|length == 1 %}one{% else %}{{ mastodon_id_users|length }}{% endif %} have something in their name or bio that looks like a Mastodon ID. (<a href="#export">see below for CSV export</a>)</p>
 <dl class="users">
   {% for u in mastodon_id_users %}
     <dt class="users"><a href="https://twitter.com/{{ u.screenname }}" class="twitter_acc_link"><span class="displayname">{{ u.name }}</span> <span class="screenname">{{ u.screenname }}</span></a></dt>

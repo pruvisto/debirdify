@@ -62,13 +62,14 @@ def handle_already_authorised(request, access_credentials):
             requested_user = me
             is_me = True
             
-        mastodon_id_users, keyword_users = extract_mastodon_ids.extract_mastodon_ids(client, requested_user)
+        mastodon_id_users, keyword_users, n_users_searched = extract_mastodon_ids.extract_mastodon_ids(client, requested_user)
         
         context = {
             'mastodon_id_users': mastodon_id_users, 
             'keyword_users': keyword_users, 
             'requested_user': requested_user, 
             'requested_name': screenname, 
+            'n_users_searched': n_users_searched,
             'me' : me,
             'is_me': is_me,
             'csv': make_csv(mastodon_id_users)
