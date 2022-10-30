@@ -98,6 +98,9 @@ def extract_mastodon_ids(client, requested_user):
                 for _, h_str, u_str, _ in _id_pattern2.findall(url):
                     mid = make_mastodon_id(u_str, h_str)
                     if mid is not None: mastodon_ids1.append(mid)
+            for _, h_str, u_str, _ in _id_pattern2.findall(screenname):
+                mid = make_mastodon_id(u_str, h_str)
+                if mid is not None: mastodon_ids1.append(mid)
                                  
             mastodon_ids2 = [x for _, h_str, u_str, _ in _id_pattern2.findall(screenname) + _id_pattern2.findall(bio) if (x := make_mastodon_id(u_str, h_str)) is not None]
             mastodon_ids = list(set(mastodon_ids1).union(set(mastodon_ids2)))
