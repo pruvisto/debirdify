@@ -1,20 +1,20 @@
 import re
 import tweepy
 
-forbidden_hosts = {'tiktok.com', 'www.tiktok.com'}
+forbidden_hosts = {'tiktok.com', 'www.tiktok.com', 'youtube.com', 'www.youtube.com', 'medium.com', 'www.medium.com'}
 
 # Matches anything of the form @foo@bar.bla or foo@bar.social or foo@social.bar or foo@barmastodonbla
 # We do not match everything of the form foo@bar or foo@bar.bla to avoid false positives like email addresses
-_id_pattern1 = re.compile(r'(@[^\s(),:;#<>&]+@[^\s():;#]+\.[^\s(),:;#<>&]+|[^\s(),:;#<>&]+@[^\s(),:;#<>&]+\.social|[^\s(),:;#<>&]+@social\.[^\s(),:;#<>&]+|[^\s(),:;#<>&]+@[^\s(),:;#<>&]*mastodon[^\s(),:;#<>&]+)', re.IGNORECASE)
-_id_pattern2 = re.compile(r'\b(http://|https://)?([^\s(),:;#<>&/]+)/@([^\s(),:;#<>&/]+)(/)?\b', re.IGNORECASE)
+_id_pattern1 = re.compile(r'(@[^\s(),:;#<>&/]+@[^\s(),:;#<>&/]+\.[^\s(),:;#<>&/]+|[^\s(),:;#<>&/]+@[^\s(),:;#<>&/]+\.social|[^\s(),:;#<>&/]+@social\.[^\s(),:;#<>&/]+|[^\s(),:;#<>&/]+@[^\s(),:;#<>&/]*mastodon[^\s(),:;#<>&/]+)', re.IGNORECASE)
+_id_pattern2 = re.compile(r'\b(http://|https://)?([^\s(),:;#<>&/]+\.[^\s(),:;#<>&/]+)/@([^\s(),:;#<>&/]+)(/)?\b', re.IGNORECASE)
 
 # Matches some key words that might occur in bios
 _keyword_pattern = re.compile(r'.*(mastodon|toot|tröt).*', re.IGNORECASE)
 
 class MastodonID:
     def __init__(self, user_part, host_part):
-        self.user_part = user_part
-        self.host_part = host_part
+        self.user_part = user_part.lower()
+        self.host_part = host_part.lower()
 
     def __str__(self):
         return '{}@{}'.format(self.user_part, self.host_part)
@@ -57,7 +57,7 @@ def extract_urls(u):
     return results
 
 def make_mastodon_id(u, h):
-    if h in forbidden_hosts: return None
+    if h.lower() in forbidden_hosts: return None
     return MastodonID(u, h)
 
 # client: a tweepy.Client object

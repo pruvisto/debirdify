@@ -81,6 +81,8 @@ def handle_already_authorised(request, access_credentials):
         response = render(request, "rate.html", {})
         return response
     except TweepyException as e:
+        print(e)
+        traceback.print_exc()
         context = {}
         response = render(request, "error.html", context)
         set_cookie(response, settings.TWITTER_CREDENTIALS_COOKIE, access_credentials[0] + ':' + access_credentials[1])
