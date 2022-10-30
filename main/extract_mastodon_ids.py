@@ -23,6 +23,12 @@ class MastodonID:
     def url(self):
         return 'https://{}/@{}'.format(self.host_part, self.user_part)
         
+    def __eq__(self, other):
+        return self.user_part == other.user_part and self.host_part == other.host_part
+        
+    def __hash__(self):
+        return hash((self.user_part, self.host_part))
+        
 def parse_mastodon_id(s):
     if s[:1] == '@':
         s = s[1:]
@@ -93,13 +99,13 @@ def extract_mastodon_ids(client, requested_user):
             screenname = u.username
             bio = u.description
             mastodon_ids = set()
-            mastodon_ids1 = [mid for s in _id_pattern1.findall(screenname) + _id_pattern1.findall(bio)
+            mastodon_ids1 = [mid for s in _id_pattern1.findall(name) + _id_pattern1.findall(bio)
                                  if (mid := parse_mastodon_id(s)) is not None]
             for url in extract_urls(u):
                 for _, h_str, _, u_str in _url_pattern.findall(url):
                     mid = make_mastodon_id(u_str, h_str)
                     if mid is not None: mastodon_ids1.append(mid)
-            for _, h_str, _, u_str in _id_pattern2.findall(screenname):
+            for _, h_str, _, u_str in _id_pattern2.findall(name):
                 mid = make_mastodon_id(u_str, h_str)
                 if mid is not None: mastodon_ids1.append(mid)
                                  
