@@ -8,7 +8,7 @@ A CSV export for import into Mastodon is also provided.
 
 ## Canonical instance
 
-An experimental canonical instance of this is hosted on (https://pruvisto.org/debirdify).
+An experimental canonical instance of this is hosted on [https://pruvisto.org/debirdify].
 
 
 ## Implementation
@@ -43,6 +43,6 @@ Note that if you use this software you will have to get a Twitter developer acco
 
 ## Contact
 
-If you have any questions or suggestions, contact (https://graz.social/@pruvisto)[@pruvisto@graz.social]. Pull requests are welcome, but I may be too busy to put too much work into this project. Forks/other instances of this are also very welcome.
+If you have any questions or suggestions, contact [https://graz.social/@pruvisto](@pruvisto@graz.social). Pull requests are welcome, but I may be too busy to put too much work into this project. Forks/other instances of this are also very welcome.
 
 
