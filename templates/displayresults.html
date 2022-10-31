@@ -40,7 +40,7 @@ ul.extras {
 <body>
 <h1>Debirdify</h1>
 
-<p>Check if the people somebody is following are on Mastodon or elsewhere in the Fediverse.</p>
+<p>Check if the people somebody is following are on Mastodon or elsewhere in the Fediverse. This may take up to a minute they follow a lot of people.</p>
 <form action="./" method="get">
 <label for="screenname">Twitter handle:</label><br>
 <input type="text" id="screenname" name="screenname" value="@{% if is_me %}{{ me.username }}{% else %}{{ requested_name }}{% endif %}"><br>
@@ -49,6 +49,10 @@ ul.extras {
 
 <h2>Results</h2>
 
+{% if error_message is not none %}
+<p><span style="font-weight: bold;">Error:</span> {{ error_message }}</p>
+
+{% else %}
 {% if requested_user is none %}
 <p>There is no user called @{{requested_name}}.</p>
 {% else %}
@@ -98,6 +102,8 @@ ul.extras {
     </dd>
   {% endfor %}
 </dl>
+{% endif %}
+
 {% endif %}
 
 {% endif %}

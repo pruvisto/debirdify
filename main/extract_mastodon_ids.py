@@ -1,6 +1,9 @@
 import re
 import tweepy
 
+# Max pages of followees to query (1 page is roughly 1000 followees)
+max_pages = 5
+
 _forbidden_hosts = {'tiktok.com', 'youtube.com', 'medium.com', 'skeb.jp', 'pronouns.page', 'foundation.app', 'gamejolt.com', 'traewelling.de'}
 
 # Matches anything of the form @foo@bar.bla or foo@bar.social or foo@social.bar or foo@barmastodonbla
@@ -52,10 +55,8 @@ class UserResult:
         self.mastodon_ids = mastodon_ids
         self.extras = extras
 
-max_pages = 5
-
-def extract_urls(u):
-    if u.entities is None: return []
+def extract_urls_from_user(u):
+    if u is None or u.entities is None: return []
     results = list()
     def aux(urls):
         for url in urls:
@@ -70,6 +71,10 @@ def extract_urls(u):
     if ('location' in u.entities) and ('urls' in u.entities['location']):
         aux(u.entities['location']['urls'])
     return results
+
+def extract_urls_from_tweet(t):
+    if t is None or t.entities is None or 'urls' not in t.entities: return []
+    return [x['expanded_url'] for x in t.entities['urls'] if 'expanded_url' in x]
 
 def make_mastodon_id(u, h):
     if is_forbidden_host(h): return None
@@ -89,15 +94,18 @@ def extract_mastodon_ids(client, requested_user):
     next_token = None
     pages = 1
     n_users = 0
-    
+    tweet_rate_limit_hit = False
+        
     while pages <= max_pages:
-        resp = client.get_users_following(requested_user.id, max_results=1000, user_auth=True, user_fields=['name', 'username', 'description', 'entities', 'location'], pagination_token=next_token)
+        resp = client.get_users_following(requested_user.id, max_results=1000, user_auth=True, user_fields=['name', 'username', 'description', 'entities', 'location', 'pinned_tweet_id'], tweet_fields=['entities'], expansions='pinned_tweet_id', pagination_token=next_token)
 
         try:
           next_token = resp.meta['next_token']
         except:
           next_token = None
         users = resp.data
+        pinned_tweets = resp.includes.get('tweets') or []
+        pinned_tweets = {t.id: t for t in pinned_tweets}
         pages = pages + 1
         n_users += len(users)
         
@@ -107,22 +115,33 @@ def extract_mastodon_ids(client, requested_user):
             location = u.location
             screenname = u.username
             bio = u.description
-            mastodon_ids = set()
-            mastodon_ids1 = [mid for s in _id_pattern1.findall(name) + _id_pattern1.findall(bio)
-                                 if (mid := parse_mastodon_id(s)) is not None]
-            for url in extract_urls(u):
+            if u.pinned_tweet_id is not None:
+                pinned_tweet = pinned_tweets.get(u.pinned_tweet_id)
+            else:
+                pinned_tweet = None
+                
+            extras = None
+            mastodon_ids = {mid for s in _id_pattern1.findall(name) + _id_pattern1.findall(bio)
+                                if (mid := parse_mastodon_id(s)) is not None}
+            for url in extract_urls_from_user(u) + extract_urls_from_tweet(pinned_tweet):
                 for _, h_str, _, u_str in _url_pattern.findall(url):
                     mid = make_mastodon_id(u_str, h_str)
-                    if mid is not None: mastodon_ids1.append(mid)
+                    if mid is not None: mastodon_ids.add(mid)
             for s in (name, location):
                 if s is None: continue
                 for _, h_str, _, u_str in _id_pattern2.findall(s):
                     mid = make_mastodon_id(u_str, h_str)
-                    if mid is not None: mastodon_ids1.append(mid)
-                                 
-            mastodon_ids2 = [x for _, h_str, _, u_str in _id_pattern2.findall(screenname) + _id_pattern2.findall(bio) if (x := make_mastodon_id(u_str, h_str)) is not None]
-            mastodon_ids = list(set(mastodon_ids1).union(set(mastodon_ids2)))
-            extras = None
+                    if mid is not None: mastodon_ids.add(mid)
+            
+            texts = [screenname, bio]
+            if pinned_tweet is not None: texts.append(pinned_tweet.text)
+            for text in texts:
+                for _, h_str, _, u_str in _id_pattern2.findall(text):
+                    mid = make_mastodon_id(u_str, h_str)
+                    if mid is not None: mastodon_ids.add(mid)
+                    
+            mastodon_ids = list(mastodon_ids)
+            mastodon_ids.sort(key=(lambda mid: str(mid)))
             
             if not mastodon_ids:
               extras = list()

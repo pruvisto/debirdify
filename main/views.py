@@ -81,6 +81,25 @@ def handle_already_authorised(request, access_credentials):
     except tweepy.TooManyRequests:
         response = render(request, "rate.html", {})
         return response
+    except tweepy.BadRequest:
+        if 'screenname' in request.GET:
+            screenname = request.GET['screenname']
+            if screenname[:1] == '@': screenname = screenname[1:]
+        else:
+            screenname = ''
+        context = {
+          'error_message': 'The Twitter API rejected our request. Are you sure what you entered is a valid Twitter handle? (e.g. @pruvisto)',
+          'requested_name': screenname,
+          'mastodon_id_users': [],
+          'keyword_users': [],
+          'n_users_searched': 0,
+          'requested_user': None,
+          'me': None,
+          'is_me': 'screenname' not in request.GET,
+          'csv': None
+        }
+        response = render(request, "displayresults.html", context)
+        return response
     except TweepyException as e:
         print(e)
         traceback.print_exc()
@@ -125,6 +144,7 @@ def index(request):
             access_token, access_token_secret = oauth1_user_handler.get_access_token(request_secret)
             return handle_already_authorised(request, (access_token, access_token_secret))
         except TweepyException as e:
+            print(e)
             return handle_auth_request(request)
 
     else:
