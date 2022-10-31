@@ -1,7 +1,7 @@
 import re
 import tweepy
 
-_forbidden_hosts = {'tiktok.com', 'youtube.com', 'medium.com', 'skeb.jp', 'pronouns.page', 'foundation.app', 'gamejolt.com'}
+_forbidden_hosts = {'tiktok.com', 'youtube.com', 'medium.com', 'skeb.jp', 'pronouns.page', 'foundation.app', 'gamejolt.com', 'traewelling.de'}
 
 # Matches anything of the form @foo@bar.bla or foo@bar.social or foo@social.bar or foo@barmastodonbla
 # We do not match everything of the form foo@bar or foo@bar.bla to avoid false positives like email addresses
@@ -16,7 +16,7 @@ def is_forbidden_host(h):
     return False
 
 # Matches some key words that might occur in bios
-_keyword_pattern = re.compile(r'.*(mastodon|toot|tröt).*', re.IGNORECASE)
+_keyword_pattern = re.compile(r'.*(mastodon|toot|tröt|fedi).*', re.IGNORECASE)
 
 class MastodonID:
     def __init__(self, user_part, host_part):
@@ -67,6 +67,8 @@ def extract_urls(u):
         aux(u.entities['url']['urls'])
     if ('description' in u.entities) and ('urls' in u.entities['description']):
         aux(u.entities['description']['urls'])
+    if ('location' in u.entities) and ('urls' in u.entities['location']):
+        aux(u.entities['location']['urls'])
     return results
 
 def make_mastodon_id(u, h):
@@ -89,7 +91,7 @@ def extract_mastodon_ids(client, requested_user):
     n_users = 0
     
     while pages <= max_pages:
-        resp = client.get_users_following(requested_user.id, max_results=1000, user_auth=True, user_fields=['name', 'username', 'description', 'entities'], pagination_token=next_token)
+        resp = client.get_users_following(requested_user.id, max_results=1000, user_auth=True, user_fields=['name', 'username', 'description', 'entities', 'location'], pagination_token=next_token)
 
         try:
           next_token = resp.meta['next_token']
@@ -102,6 +104,7 @@ def extract_mastodon_ids(client, requested_user):
         for u in users:
             uid = u.id
             name = u.name
+            location = u.location
             screenname = u.username
             bio = u.description
             mastodon_ids = set()
@@ -111,9 +114,11 @@ def extract_mastodon_ids(client, requested_user):
                 for _, h_str, _, u_str in _url_pattern.findall(url):
                     mid = make_mastodon_id(u_str, h_str)
                     if mid is not None: mastodon_ids1.append(mid)
-            for _, h_str, _, u_str in _id_pattern2.findall(name):
-                mid = make_mastodon_id(u_str, h_str)
-                if mid is not None: mastodon_ids1.append(mid)
+            for s in (name, location):
+                if s is None: continue
+                for _, h_str, _, u_str in _id_pattern2.findall(s):
+                    mid = make_mastodon_id(u_str, h_str)
+                    if mid is not None: mastodon_ids1.append(mid)
                                  
             mastodon_ids2 = [x for _, h_str, _, u_str in _id_pattern2.findall(screenname) + _id_pattern2.findall(bio) if (x := make_mastodon_id(u_str, h_str)) is not None]
             mastodon_ids = list(set(mastodon_ids1).union(set(mastodon_ids2)))
@@ -132,6 +137,9 @@ def extract_mastodon_ids(client, requested_user):
        
         if next_token is None:
             break
+
+    results1.sort(key = (lambda u: u.screenname.lower()))
+    results2.sort(key = (lambda u: u.screenname.lower()))
 
     return (results1, results2, n_users)
 

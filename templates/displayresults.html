@@ -40,7 +40,7 @@ ul.extras {
 <body>
 <h1>Debirdify</h1>
 
-<p>Check if the people somebody is following are on Mastodon.</p>
+<p>Check if the people somebody is following are on Mastodon or elsewhere in the Fediverse.</p>
 <form action="./" method="get">
 <label for="screenname">Twitter handle:</label><br>
 <input type="text" id="screenname" name="screenname" value="@{% if is_me %}{{ me.username }}{% else %}{{ requested_name }}{% endif %}"><br>
@@ -53,14 +53,14 @@ ul.extras {
 <p>There is no user called @{{requested_name}}.</p>
 {% else %}
 {% if mastodon_id_users or keyword_users %}
-<p>Good news! Some of the people {% if is_me %}you follow{% else %}@{{ requested_user.username }} follows{% endif %} seem to have a Mastodon account:</p>
+<p>Good news! Some of the people {% if is_me %}you follow{% else %}@{{ requested_user.username }} follows{% endif %} seem to have a Fediverse account:</p>
 {% else %}
 <p>Sadly, none of the people {% if is_me %}<a href="https://twitter.com/{{ me.username }}">you</a> follow{% else %}<a href="https://twitter.com/{{ requested_user.username }}">@{{ requested_user.username }}</a> follows{% endif %} seem to have a Mastodon account.</p>
 {% endif %}
 
 
 {% if mastodon_id_users %}
-<p>Out of the {{ n_users_searched }} accounts you follow that we looked at, the following {% if mastodon_id_users|length == 1 %}one{% else %}{{ mastodon_id_users|length }}{% endif %} have something in their name or bio that looks like a Mastodon ID. (<a href="#export">see below for CSV export</a>)</p>
+<p>Out of the {{ n_users_searched }} accounts that we looked at, the following {% if mastodon_id_users|length == 1 %}one has{% else %}{{ mastodon_id_users|length }} have{% endif %} something in their name or bio that looks like a Fediverse ID. (<a href="#export">see below for CSV export</a>)</p>
 <dl class="users">
   {% for u in mastodon_id_users %}
     <dt class="users"><a href="https://twitter.com/{{ u.screenname }}" class="twitter_acc_link"><span class="displayname">{{ u.name }}</span> <span class="screenname">{{ u.screenname }}</span></a></dt>
@@ -76,7 +76,7 @@ ul.extras {
 
 
 <h2>CSV Export</h2>
-<p><a id="export"></a>You can bulk-follow all the above accounts on Mastodon by downloading the CSV file below and importing it on Mastodon under Settings → Import and Export → Import. Make sure to select ‘merge’, not ‘overwrite’.</p>
+<p><a id="export"></a>You can bulk-follow all the above accounts on Fediverse by downloading the CSV file below and importing it e.g. on Mastodon under Settings → Import and Export → Import. Make sure to select ‘merge’, not ‘overwrite’.</p>
 <p style="margin-bottom: 2em">
 <a class="button" href="data:text/plain;charset=utf-8,{{ csv|urlencode }}" download="following_accounts.csv">Download CSV Export</a>
 </p>

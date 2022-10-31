@@ -23,7 +23,8 @@ def set_cookie(response, key, value, days_expire=7):
         max_age=max_age,
         expires=expires,
         samesite='Strict',
-        secure=True
+        secure=True,
+        httponly=True
     )
 
 def mk_oauth1():
