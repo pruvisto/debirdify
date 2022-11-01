@@ -41,7 +41,7 @@ ul.extras {
 <h1>Debirdify</h1>
 
 <p>Check if the people somebody is following are on Mastodon or elsewhere in the Fediverse. This may take up to a minute they follow a lot of people.</p>
-<form action="./" method="get">
+<form action="/debirdify/" method="get">
 <label for="screenname">Twitter handle:</label><br>
 <input type="text" id="screenname" name="screenname" value="@{% if is_me %}{{ me.username }}{% else %}{{ requested_name }}{% endif %}"><br>
 <input type="submit" value="Find Mastodon IDs">
