@@ -23,10 +23,10 @@ class MissingEnvVariable(Exception):
         self.message = message.format({v})
         super().__init__(self.message)
         
-def env(s, default=None):
+def env(s, default=None, obligatory=True):
     if s in os.environ:
         return os.environ[s]
-    elif default is not None:
+    elif default is not None or not obligatory:
         return default
     else:
         raise MissingEnvVariable(s)
@@ -51,6 +51,7 @@ TWITTER_CONSUMER_CREDENTIALS = [x.strip() for x in env('DEBIRDIFY_CONSUMER_CREDE
 if len(TWITTER_CONSUMER_CREDENTIALS) != 2:
     raise MissingEnvVariable('DEBIRDIFY_CONSUMER_CREDENTIALS')
 TWITTER_CREDENTIALS_COOKIE = env('DEBIRDIFY_ACCESS_CREDENTIALS_COOKIE', 'twitter_access_credentials')
+INSTANCE_DB = env('DEBIRDIFY_INSTANCE_DB', obligatory=False)
 
 # Application definition
 

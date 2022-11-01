@@ -2,6 +2,7 @@ from django.shortcuts import render
 from django.http import HttpResponse
 from django.conf import settings
 import tweepy
+import sqlite3
 from . import extract_mastodon_ids
 from tweepy import TweepyException
 import re
@@ -63,7 +64,31 @@ def handle_already_authorised(request, access_credentials):
             requested_user = me
             is_me = True
             
-        mastodon_id_users, keyword_users, n_users_searched = extract_mastodon_ids.extract_mastodon_ids(client, requested_user)
+        if settings.INSTANCE_DB is not None:
+            try:
+                instance_db = sqlite3.connect(settings.INSTANCE_DB)
+                cursor = instance_db.cursor()
+            except Exception as e:
+                instance_db = None 
+                cursor = None
+        else:
+            instance_db = None
+            
+        def known_host_callback(s):
+            if cursor is None: return False
+            try:
+                row = cursor.execute('SELECT name FROM instances WHERE name=?', (s,)).fetchone()
+                return row is not None
+            except:
+                return False
+            
+        mastodon_id_users, keyword_users, n_users_searched =            extract_mastodon_ids.extract_mastodon_ids(
+            client, requested_user, known_host_callback = known_host_callback)
+                
+        try:
+            if instance_db is not None: instance_db.close()
+        except:
+            pass
         
         context = {
             'mastodon_id_users': mastodon_id_users, 
@@ -100,6 +125,11 @@ def handle_already_authorised(request, access_credentials):
         }
         response = render(request, "displayresults.html", context)
         return response
+    except ConnectionError as e:
+        context = {}
+        response = render(request, "error.html", context)
+        set_cookie(response, settings.TWITTER_CREDENTIALS_COOKIE, access_credentials[0] + ':' + access_credentials[1])
+        return response        
     except TweepyException as e:
         print(e)
         traceback.print_exc()
