@@ -73,6 +73,7 @@ def handle_already_authorised(request, access_credentials):
                 cursor = None
         else:
             instance_db = None
+            cursor = None
             
         def known_host_callback(s):
             if cursor is None: return False
