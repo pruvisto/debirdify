@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django.http import HttpResponse
 from django.conf import settings
+from django.views.decorators.gzip import gzip_page
 import tweepy
 import sqlite3
 from . import extract_mastodon_ids
@@ -191,6 +192,7 @@ def try_get_twitter_credentials(request):
     if len(xs) != 2: return None
     return xs[0].strip(), xs[1].strip()
 
+@gzip_page
 def index(request):
     # clear the credentials cookie if the users requests it
     if 'clear' in request.GET:
