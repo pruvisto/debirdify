@@ -58,7 +58,7 @@ def handle_already_authorised(request, access_credentials):
             screenname = request.GET['screenname']
             if screenname[:1] == '@': screenname = screenname[1:]
             requested_user = client.get_user(username=screenname, user_auth=True).data
-            is_me = False
+            is_me = (requested_user.id == me.id)
         else:
             screenname=me.username
             requested_user = me
@@ -82,9 +82,33 @@ def handle_already_authorised(request, access_credentials):
                 return row is not None
             except:
                 return False
-            
-        mastodon_id_users, keyword_users, n_users_searched =            extract_mastodon_ids.extract_mastodon_ids(
-            client, requested_user, known_host_callback = known_host_callback)
+
+        lists = None
+        results = None
+        mid_results = []
+        extra_results = []
+        requested_lists = None
+        action = None
+        n_users = None
+
+        if 'getfollowed' in request.GET:
+            action = 'getfollowed'
+            results = extract_mastodon_ids.extract_mastodon_ids(
+                client, requested_user, known_host_callback = known_host_callback)
+        elif 'getlists' in request.GET:
+            action = 'getlists'
+            lists = extract_mastodon_ids.get_lists(client, requested_user)
+        elif 'getlist' in request.GET:
+            action = 'getlist'
+            lists = extract_mastodon_ids.get_lists(client, requested_user)
+            requested_lists = [lst for lst in lists if ('list_%s' % lst.id) in request.GET]
+            requested_list_ids = [lst.id for lst in requested_lists]
+            results = extract_mastodon_ids.extract_mastodon_ids_from_lists(client, requested_list_ids, known_host_callback=known_host_callback)
+                
+        if results is not None:
+            mid_results = results.mid_results
+            extra_results = results.extra_results
+            n_users = results.n_users
                 
         try:
             if instance_db is not None: instance_db.close()
@@ -92,14 +116,17 @@ def handle_already_authorised(request, access_credentials):
             pass
         
         context = {
-            'mastodon_id_users': mastodon_id_users, 
-            'keyword_users': keyword_users, 
+            'action': action,
+            'mastodon_id_users': mid_results,
+            'keyword_users': extra_results,
             'requested_user': requested_user, 
             'requested_name': screenname, 
-            'n_users_searched': n_users_searched,
+            'requested_lists': requested_lists,
+            'n_users_searched': n_users,
             'me' : me,
             'is_me': is_me,
-            'csv': make_csv(mastodon_id_users)
+            'csv': make_csv(mid_results),
+            'lists': lists
         }
         response = render(request, "displayresults.html", context)
         set_cookie(response, settings.TWITTER_CREDENTIALS_COOKIE, access_credentials[0] + ':' + access_credentials[1])
@@ -107,7 +134,7 @@ def handle_already_authorised(request, access_credentials):
     except tweepy.TooManyRequests:
         response = render(request, "rate.html", {})
         return response
-    except tweepy.BadRequest:
+    except (tweepy.BadRequest, tweepy.NotFound):
         if 'screenname' in request.GET:
             screenname = request.GET['screenname']
             if screenname[:1] == '@': screenname = screenname[1:]

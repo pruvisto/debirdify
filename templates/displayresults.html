@@ -35,39 +35,60 @@ ul.extras {
   text-indent: 0;
   padding: 0;
 }
+ul.lists {
+  list-style-type: none;
+  padding-left: 1em;
+}
 </style>
 </head>
 <body>
 <h1>Debirdify</h1>
 
-<p>Check if the people somebody is following are on Mastodon or elsewhere in the Fediverse. This may take up to a minute they follow a lot of people.</p>
-<form action="/debirdify/" method="get">
-<label for="screenname">Twitter handle:</label><br>
-<input type="text" id="screenname" name="screenname" value="@{% if is_me %}{{ me.username }}{% else %}{{ requested_name }}{% endif %}"><br>
-<input type="submit" value="Find Mastodon IDs">
+<p>Check if the people somebody is following or the members of one of their lists are on Mastodon (or elsewhere in the Fediverse).</p>
+<p>This may take a few seconds if the requested lists contain a lot of people – be patient and do not refresh the page too quickly.</p>
+<form action="./" method="get">
+<label for="screenname">Twitter username:</label>&nbsp;
+<input type="text" id="screenname" name="screenname" value="@{% if is_me %}{{ me.username }}{% else %}{{ requested_name }}{% endif %}"></td>
+<br><br>
+<input type="submit" value="Search followed accounts" name="getfollowed">&nbsp;&nbsp;<input type="submit" value="Retrieve lists" name="getlists">
 </form>
-
-<h2>Results</h2>
 
 {% if error_message is not none %}
 <p><span style="font-weight: bold;">Error:</span> {{ error_message }}</p>
-
 {% else %}
+{% if action is not none %}
+<h2>Results</h2>
+
 {% if requested_user is none %}
 <p>There is no user called @{{requested_name}}.</p>
 {% else %}
+{% if action == 'getfollowed' or action == 'getlist' %}
 {% if mastodon_id_users or keyword_users %}
-<p>Good news! Some of the people {% if is_me %}you follow{% else %}@{{ requested_user.username }} follows{% endif %} seem to have a Fediverse account:</p>
+<p>Good news! Some of the people {% if requested_lists is none %}{% if is_me %}you follow{% else %}@{{ requested_user.username }} follows{% endif %}{% else %} in {% if is_me %}your{% else %}@{{ requested_user.username }}'s{% endif %} lists{% endif %} seem to have a Fediverse account:</p>
 {% else %}
 <p>Sadly, none of the people {% if is_me %}<a href="https://twitter.com/{{ me.username }}">you</a> follow{% else %}<a href="https://twitter.com/{{ requested_user.username }}">@{{ requested_user.username }}</a> follows{% endif %} seem to have a Mastodon account.</p>
 {% endif %}
+{% endif %}
+{% endif %}
 
+{% if action == 'getlists' %}
+<p>{% if is_me %}You have{% else %}@{{ requested_name }} has{% endif %} {% if lists %}the following{% else %}no{% endif %} {% if not is_me %}public {% endif %}list{% if list|length != 1%}s{% endif %}. Select the ones you want to search.</p>
+<form action="./" method="get">
+<ul class="lists">
+{% for lst in lists %}
+<li><input type="checkbox" id="list_{{ lst.id }}" name="list_{{ lst.id }}"> <label for="list_{{ lst.id }}"><a href="https://twitter.com/i/lists/{{ lst.id|urlencode }}" target="_blank">{{ lst.name }}</a></label></li>
+{% endfor %}
+</ul>
+<input type="hidden" name="screenname" value="{{requested_name}}">
+<input type="submit" name="getlist" value="Search lists">
+</form>
+{% endif %}
 
 {% if mastodon_id_users %}
 <p>Out of the {{ n_users_searched }} accounts that we looked at, the following {% if mastodon_id_users|length == 1 %}one has{% else %}{{ mastodon_id_users|length }} have{% endif %} something in their name or bio that looks like a Fediverse ID. (<a href="#export">see below for CSV export</a>)</p>
 <dl class="users">
   {% for u in mastodon_id_users %}
-    <dt class="users"><a href="https://twitter.com/{{ u.screenname }}" class="twitter_acc_link"><span class="displayname">{{ u.name }}</span> <span class="screenname">{{ u.screenname }}</span></a></dt>
+    <dt class="users"><a href="https://twitter.com/{{ u.screenname|urlencode }}" class="twitter_acc_link" target="_blank"><span class="displayname">{{ u.name }}</span> <span class="screenname">{{ u.screenname }}</span></a></dt>
     <dd class="users">
       <ul class="mids">
        {% for mid in u.mastodon_ids %}
