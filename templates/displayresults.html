@@ -29,7 +29,7 @@
 {% endif %}
 
 {% if action == 'getlists' %}
-<p>{% if is_me %}You have{% else %}@{{ requested_name }} has{% endif %} {% if lists %}the following{% else %}no{% endif %} {% if not is_me %}public {% endif %}list{% if list|length != 1%}s{% endif %}. Select the ones you want to search.</p>
+<p>{% if is_me %}You have{% else %}@{{ requested_name }} has{% endif %} {% if lists %}the following{% else %}no{% endif %} {% if not is_me %}public {% endif %}list{% if list|length != 1%}s{% endif %}. Select the ones you want to search by clicking the checkboxes next to them.</p>
 <form action="./" method="get">
 <ul class="lists">
 {% for lst in lists %}
