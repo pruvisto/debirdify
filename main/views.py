@@ -104,11 +104,18 @@ def handle_already_authorised(request, access_credentials):
             lists = extract_mastodon_ids.get_lists(client, requested_user)
             requested_lists = [lst for lst in lists if ('list_%s' % lst.id) in request.GET]
             requested_list_ids = [lst.id for lst in requested_lists]
+            if 'list_followed' in request.GET:
+                results_followed = extract_mastodon_ids.extract_mastodon_ids(
+                    client, requested_user, known_host_callback = known_host_callback)
+            else:
+                results_followed = None
             results = extract_mastodon_ids.extract_mastodon_ids_from_lists(client, requested_list_ids, known_host_callback=known_host_callback)
+            if results_followed is not None:
+                results_followed.merge(results)
+                results = results_followed
                 
         if results is not None:
-            mid_results = results.mid_results
-            extra_results = results.extra_results
+            mid_results, extra_results = results.get_results()
             n_users = results.n_users
                 
         try:

@@ -84,6 +84,19 @@ class UserResult:
         self.bio = bio
         self.mastodon_ids = mastodon_ids
         self.extras = extras
+        
+    def merge(self, r):
+        if r.uid != self.uid: return
+        if r.mastodon_ids is not None:
+            for mid in r.mastodon_ids:
+                if mid not in self.mastodon_ids:
+                   self.mastodon_ids.append(mid)
+            self.mastodon_ids.sort(key=str)
+        if r.extras is not None:
+            for extra in r.extras:
+               if extra not in self.extras:
+                   self.extras.append(extra)
+            self.extras.sort()
 
 def extract_urls_from_user(u, known_host_callback = None):
     if u is None or u.entities is None: return []
@@ -121,7 +134,8 @@ def get_lists(client, requested_user):
     while page <= max_lists_pages:
         page += 1
         resp = client.get_owned_lists(requested_user.id, user_auth=True, user_fields='id', pagination_token=next_token)
-        for lst in resp.data:
+        lists = resp.data or []
+        for lst in lists:
             results.append(List(lst.id, lst.name))
         try:
           next_token = resp.meta['next_token']
@@ -132,19 +146,25 @@ def get_lists(client, requested_user):
     
 class Results:
     def __init__(self):
-        self.mid_results = list()
-        self.extra_results = list()
+        self.results = dict()
         self.n_users = 0
         
     def add(self, r):
-        if r.mastodon_ids:
-            self.mid_results.append(r)
-        elif r.extras:
-            self.extra_results.append(r)
+        if r.uid in self.results:
+            self.results[r.uid].merge(r)
+        else:
+            self.results[r.uid] = r
+            
+    def merge(self, rs):
+        for r in rs.results.values():
+            self.add(r)
 
-    def sort(self):
-        self.mid_results.sort(key=(lambda u: u.screenname))
-        self.extra_results.sort(key=(lambda u: u.screenname))
+    def get_results(self):
+        mid_results = [r for r in self.results.values() if r.mastodon_ids]
+        mid_results.sort(key=(lambda u: u.screenname))
+        extra_results = [r for r in self.results.values() if not r.mastodon_ids and r.extras]
+        extra_results.sort(key=(lambda u: u.screenname))
+        return mid_results, extra_results
     
     
 # client: a tweepy.Client object
@@ -266,7 +286,6 @@ def extract_mastodon_ids(client, requested_user, known_host_callback = None):
         if next_token is None:
             break
 
-    results.sort()
     return results
     
 def extract_mastodon_ids_from_lists(client, requested_list_ids, known_host_callback=None):
@@ -298,6 +317,5 @@ def extract_mastodon_ids_from_lists(client, requested_list_ids, known_host_callb
             if next_token is None:
                 break
 
-    results.sort()
     return results
 

@@ -29,9 +29,10 @@
 {% endif %}
 
 {% if action == 'getlists' %}
-<p>{% if is_me %}You have{% else %}@{{ requested_name }} has{% endif %} {% if lists %}the following{% else %}no{% endif %} {% if not is_me %}public {% endif %}list{% if list|length != 1%}s{% endif %}. Select the ones you want to search by clicking the checkboxes next to them.</p>
+<p>{% if is_me %}You have{% else %}@{{ requested_name }} has{% endif %} {% if lists %}the following{% else %}no{% endif %} {% if not is_me %}public {% endif %}list{% if list|length != 1%}s{% endif %}.{%if not lists %}</p>{% else %} Select the ones you want to search by clicking the checkboxes next to them.</p>
 <form action="./" method="get">
 <ul class="lists">
+<li><input type="checkbox" id="list_followed" name="list_followed"> <label for="list_followed"><a href="https://twitter.com/{{ requested_user.screenname }}/following" target="_blank">Followed accounts</a></label></li>
 {% for lst in lists %}
 <li><input type="checkbox" id="list_{{ lst.id }}" name="list_{{ lst.id }}"> <label for="list_{{ lst.id }}"><a href="https://twitter.com/i/lists/{{ lst.id|urlencode }}" target="_blank">{{ lst.name }}</a></label></li>
 {% endfor %}
@@ -39,6 +40,7 @@
 <input type="hidden" name="screenname" value="{{requested_name}}">
 <input type="submit" name="getlist" value="Search lists">
 </form>
+{% endif %}
 {% endif %}
 
 {% if mastodon_id_users %}
