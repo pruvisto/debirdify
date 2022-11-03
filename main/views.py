@@ -44,6 +44,7 @@ def make_csv(users):
     return '\n'.join(['Account address,Show boosts'] + ["{},true".format(mid) for u in users for mid in u.mastodon_ids])
 
 def handle_already_authorised(request, access_credentials):
+    screenname = ''
     try:
         client = tweepy.Client(
             consumer_key=settings.TWITTER_CONSUMER_CREDENTIALS[0],
@@ -132,7 +133,18 @@ def handle_already_authorised(request, access_credentials):
         set_cookie(response, settings.TWITTER_CREDENTIALS_COOKIE, access_credentials[0] + ':' + access_credentials[1])
         return response
     except tweepy.TooManyRequests:
-        response = render(request, "rate.html", {})
+        context = {
+          'error_message': 'You made too many requests too quickly. Please slow down a bit. This is not us being petty; Twitter enforces per-user rate limiting. This can happen especially if you repeatedly search through hundreds or thousands of accounts.',
+          'requested_name': screenname,
+          'mastodon_id_users': [],
+          'keyword_users': [],
+          'n_users_searched': 0,
+          'requested_user': None,
+          'me': None,
+          'is_me': 'screenname' not in request.GET,
+          'csv': None
+        }
+        response = render(request, "displayresults.html", context)
         return response
     except (tweepy.BadRequest, tweepy.NotFound):
         if 'screenname' in request.GET:
