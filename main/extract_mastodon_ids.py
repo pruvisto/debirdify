@@ -178,6 +178,7 @@ class Results:
     def merge(self, rs):
         for r in rs.results.values():
             self.add(r)
+        self.n_users += rs.n_users
 
     def get_results(self):
         mid_results = [r for r in self.results.values() if r.mastodon_ids]
