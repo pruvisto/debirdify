@@ -39,7 +39,7 @@ pl_muted = Pseudolist('muted', 'Muted accounts', 'get_muted', private = True)
 pseudolists = [pl_following, pl_followers, pl_blocked, pl_muted]
 
 
-_forbidden_hosts = {'tiktok.com', 'youtube.com', 'medium.com', 'skeb.jp', 'pronouns.page', 'foundation.app', 'gamejolt.com', 'traewelling.de', 'observablehq.com', 'gmail.com'}
+_forbidden_hosts = {'tiktok.com', 'youtube.com', 'medium.com', 'skeb.jp', 'pronouns.page', 'foundation.app', 'gamejolt.com', 'traewelling.de', 'observablehq.com', 'gmail.com', 'hotmail.com'}
 
 # Matches anything of the form @foo@bar.bla or foo@bar.social or foo@social.bar or foo@barmastodonbla
 # We do not match everything of the form foo@bar or foo@bar.bla to avoid false positives like email addresses
