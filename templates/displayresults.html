@@ -13,6 +13,26 @@
 {% if error_message is not none %}
 <p><span style="font-weight: bold;">Error:</span> {{ error_message }}</p>
 {% else %}
+{% if requested_user %}
+<h2>Fediverse IDs in {% if is_me %}Your Own{% else %}@{{requested_user.username}}'s{%endif%} Profile</h2>
+{% if requested_user_mastodon_ids %}
+<p>We found the following Fediverse IDs in {% if is_me %}your{% else %}@{{requested_user.username}}'s{%endif%} Twitter profile:</p>
+<ul>
+{% for mid in requested_user_mastodon_ids %}
+<li class="mids"><a href="{{ mid|mid_url }}">{{ mid }}</a></li>
+{% endfor %}
+</ul>
+{% else %}
+<p>
+We found no Fediverse IDs in {% if is_me %}your{% else %}@{{requested_user.username}}'s{%endif%} Twitter profile.
+{% if is_me %}
+Please consider putting your ID in your profile (e.g. display name, bio, pinned tweet – see below <a href="#howitworks">for more details</a>) so that other people can find you.
+{% endif %}
+</p>
+{% endif %}
+{% endif %}
+
+
 {% if action is not none %}
 <h2>Results</h2>
 
@@ -88,7 +108,6 @@
     </dd>
   {% endfor %}
 </dl>
-
 
 <h2>CSV Export</h2>
 <p><a id="export"></a>You can bulk-follow, bulk-block, etc. all the above accounts on Fediverse by downloading the CSV file below and importing it e.g. on Mastodon under Settings → Import and Export → Import. Make sure to select ‘merge’, not ‘overwrite’.</p>

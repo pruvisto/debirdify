@@ -194,7 +194,6 @@ class Results:
 #   the first component contains a list of users that seem to have a Mastodon ID in their name or bio
 #   the second component contains a list of users that have some keyword in their bio that looks Mastodon-related
 def extract_mastodon_ids_from_users(client, resp, results, known_host_callback = None):
-
     lax_validator = InstanceValidator(known_host_callback=known_host_callback, mode = 'lax')
     strict_validator = InstanceValidator(known_host_callback=known_host_callback, mode = 'strict')
     
@@ -212,6 +211,7 @@ def extract_mastodon_ids_from_users(client, resp, results, known_host_callback =
         return validator.make_mastodon_id(tmp[0], tmp[1])
 
     users = resp.data
+    if 'id' in users: users = [users]    
     if not users: return
     pinned_tweets = resp.includes.get('tweets') or []
     if pinned_tweets is None: pinned_tweets = []

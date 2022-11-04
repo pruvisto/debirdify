@@ -54,16 +54,21 @@ def handle_already_authorised(request, access_credentials):
             access_token_secret=access_credentials[1]
         )
 
-        me = client.get_me(user_auth=True, user_fields=['public_metrics']).data
+        me_resp = client.get_me(user_auth=True, user_fields=['name', 'username', 'description', 'entities', 'location', 'pinned_tweet_id', 'public_metrics'],
+                tweet_fields=['entities'], expansions='pinned_tweet_id')
+        me = me_resp.data
 
         if 'screenname' in request.GET:
             screenname = request.GET['screenname']
             if screenname[:1] == '@': screenname = screenname[1:]
-            requested_user = client.get_user(username=screenname, user_auth=True, user_fields=['public_metrics']).data
+            requested_user_resp = client.get_user(username=screenname, user_auth=True, user_fields=['name', 'username', 'description', 'entities', 'location', 'pinned_tweet_id', 'public_metrics'],
+                tweet_fields=['entities'], expansions='pinned_tweet_id')
+            requested_user = requested_user_resp.data
             is_me = (requested_user.id == me.id)
         else:
             screenname=me.username
             requested_user = me
+            requested_user_resp = me_resp
             is_me = True
             
         if settings.INSTANCE_DB is not None:
@@ -76,7 +81,7 @@ def handle_already_authorised(request, access_credentials):
         else:
             instance_db = None
             cursor = None
-            
+
         def known_host_callback(s):
             if cursor is None: return False
             try:
@@ -84,6 +89,14 @@ def handle_already_authorised(request, access_credentials):
                 return row is not None
             except:
                 return False
+                
+        requested_user_results = extract_mastodon_ids.Results()
+        extract_mastodon_ids.extract_mastodon_ids_from_users(client, requested_user_resp, requested_user_results, known_host_callback)
+        requested_user_mastodon_ids = requested_user_results.get_results()[0]
+        if requested_user_mastodon_ids:
+            requested_user_mastodon_ids = requested_user_mastodon_ids[0].mastodon_ids
+        else:
+            requested_user_mastodon_ids = None
 
         lists = None
         results = None
@@ -143,6 +156,7 @@ def handle_already_authorised(request, access_credentials):
         context = {
             'action': action,
             'mastodon_id_users': mid_results,
+            'requested_user_mastodon_ids': requested_user_mastodon_ids,
             'keyword_users': extra_results,
             'pseudolists': extract_mastodon_ids.pseudolists,
             'requested_user': requested_user, 
@@ -173,8 +187,6 @@ def handle_already_authorised(request, access_credentials):
         response = render(request, "displayresults.html", context)
         return response
     except (tweepy.BadRequest, tweepy.NotFound) as e:
-        print(e)
-        traceback.print_exc()
         if 'screenname' in request.GET:
             screenname = request.GET['screenname']
             if screenname[:1] == '@': screenname = screenname[1:]
