@@ -89,7 +89,7 @@ def handle_already_authorised(request, access_credentials):
                 row = cursor.execute('SELECT name FROM instances WHERE name=?', (s,)).fetchone()
                 if row is None:
                     try:
-                        instance_db.execute('INSERT INTO unknown_hosts VALUES(?)', (s,))
+                        instance_db.execute('INSERT INTO unknown_hosts (name) VALUES (?);', (s,))
                         instance_db.commit()
                     except:
                         pass
