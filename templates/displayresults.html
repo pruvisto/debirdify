@@ -11,25 +11,34 @@
 </form>
 
 {% if error_message is not none %}
-<p><span style="font-weight: bold;">Error:</span> {{ error_message }}</p>
+  <p><span style="font-weight: bold;">Error:</span> {{ error_message }}</p>
 {% else %}
-{% if requested_user %}
-<h2>Fediverse IDs in {% if is_me %}Your Own{% else %}@{{requested_user.username}}'s{%endif%} Profile</h2>
-{% if requested_user_mastodon_ids %}
-<p>We found the following Fediverse IDs in {% if is_me %}your{% else %}@{{requested_user.username}}'s{%endif%} Twitter profile:</p>
-<ul>
-{% for mid in requested_user_mastodon_ids %}
-<li class="mids"><a href="{{ mid|mid_url }}">{{ mid }}</a></li>
-{% endfor %}
-</ul>
-{% else %}
-<p>
-We found no Fediverse IDs in {% if is_me %}your{% else %}@{{requested_user.username}}'s{%endif%} Twitter profile.
-{% if is_me %}
-Please consider putting your ID in your profile (e.g. display name, bio, pinned tweet – see below <a href="#howitworks">for more details</a>) so that other people can find you.
-{% endif %}
-</p>
-{% endif %}
+  {% if requested_user %}
+    <h2>Fediverse IDs in {% if is_me %}Your Own{% else %}@{{requested_user.username}}'s{%endif%} Profile</h2>
+    {% if requested_user_mastodon_ids %}
+      <p>We found the following Fediverse IDs in {% if is_me %}<a href="https://twitter.com/{{ me.username }}">your</a>{% else %}<a href="https://twitter.com/{{ requested_user.username }}">@{{ requested_user.username }}</a>'s{%endif%} Twitter profile:</p>
+      <ul>
+      {% for mid in requested_user_mastodon_ids %}
+        <li class="mids"><a href="{{ mid|mid_url }}">{{ mid }}</a> {% if mid.exists %}✔️{% else %}❌<br>This account does not seem to exist.{% endif %}</li>
+      {% endfor %}
+      </ul>
+    {% endif %}
+    {% if requested_user_broken_mastodon_ids %}
+      <p>We found some things in {% if is_me %}<a href="https://twitter.com/{{ me.username }}">your</a>{% else %}<a href="https://twitter.com/{{ requested_user.username }}">@{{ requested_user.username }}</a>'s{%endif%} Twitter profile that might be Fediverse IDs, but we are not sure enough about it to include it in the search results.{% if is_me %}If these are genuine, please consider writing them in the suggested form to ensure tools like Debirdify will pick them up.{% endif %}
+      </p>
+      <ul>
+      {% for mid in requested_user_broken_mastodon_ids %}<li>{{ mid.original }} {% if mid.exists %}✔️{% else %}❌{% endif %}<br>{% if not mid.exists %}This does not seem to be a Fediverse account.{% else %}Suggested form: <a href="{{ mid.url }}">@{{ mid }}</a>{% endif %}</li>{% endfor %}
+      </ul>
+      <p>Debirdify cannot do an in-depth check like this for every questionable ID on a normal search, so unless it is fairly certain that something is a Fediverse ID, it will be ignored.</p>
+    {% endif %}
+    {% if not requested_user_mastodon_ids and not requested_user_broken_mastodon_ids %}
+      <p>
+      We found no Fediverse IDs in {% if is_me %}<a href="https://twitter.com/{{ me.username }}">your</a>{% else %}<a href="https://twitter.com/{{ requested_user.username }}">@{{ requested_user.username }}</a>'s{%endif%} Twitter profile.
+      {% if is_me %}
+        Please consider putting your ID in your profile (e.g. display name, bio, pinned tweet – see below <a href="#howitworks">for more details</a>) so that other people can find you – ideally in the form @name@host.tld.
+      {% endif %}
+      </p>
+  {% endif %}
 {% endif %}
 
 
@@ -73,7 +82,7 @@ Please consider putting your ID in your profile (e.g. display name, bio, pinned 
 {% endif %}
 
 {% if action == 'getlists' or action == 'getlist' and not requested_lists %}
-<p>{% if is_me %}<a href="https://twitter.com/{{ me.username }}">You</a> have{% else %}<a href="https://twitter.com/{{ requested_user.username }}">@{{ requested_user.username }}</a> has{% endif %} {% if lists %}the following{% else %}no{% endif %} {% if not is_me %}public {% endif %}list{% if list|length != 1%}s{% endif %}.{%if not lists %}</p>{% else %} Select the ones you want to search by clicking the checkboxes next to them.</p>
+<p>{% if is_me %}<a href="https://twitter.com/{{ me.username }}">You</a> have{% else %}<a href="https://twitter.com/{{ requested_user.username }}">@{{ requested_user.username }}</a> has{% endif %} the following {% if not is_me %}public {% endif %}list{% if list|length != 1%}s{% endif %}. Select the ones you want to search by clicking the checkboxes next to them.</p>
 <form action="./" method="get">
 <ul class="lists">
 <li><input type="checkbox" id="list_following" name="list_following"> <label for="list_following"><a href="https://twitter.com/{{ requested_user.username }}/following" target="_blank">Followed accounts</a></label> ({{ requested_user.public_metrics.following_count }} members)</li>
@@ -91,7 +100,6 @@ Please consider putting your ID in your profile (e.g. display name, bio, pinned 
 <input type="hidden" name="screenname" value="{{requested_name}}">
 <input type="submit" name="getlist" value="Search lists">
 </form>
-{% endif %}
 {% endif %}
 
 {% if mastodon_id_users %}

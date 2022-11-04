@@ -70,7 +70,7 @@ def handle_already_authorised(request, access_credentials):
             requested_user = me
             requested_user_resp = me_resp
             is_me = True
-            
+
         if settings.INSTANCE_DB is not None:
             try:
                 instance_db = sqlite3.connect(settings.INSTANCE_DB)
@@ -83,20 +83,38 @@ def handle_already_authorised(request, access_credentials):
             cursor = None
 
         def known_host_callback(s):
-            if cursor is None: return False
+            if cursor is None:
+                return False
             try:
                 row = cursor.execute('SELECT name FROM instances WHERE name=?', (s,)).fetchone()
-                return row is not None
+                if row is None:
+                    try:
+                        instance_db.execute('INSERT INTO unknown_hosts VALUES(?)', (s,))
+                        instance_db.commit()
+                    except:
+                        pass
+                else:
+                    return True
             except:
                 return False
                 
+        broken_mastodon_ids = []
+        requested_user_mastodon_ids = []
         requested_user_results = extract_mastodon_ids.Results()
         extract_mastodon_ids.extract_mastodon_ids_from_users(client, requested_user_resp, requested_user_results, known_host_callback)
         requested_user_mastodon_ids = requested_user_results.get_results()[0]
         if requested_user_mastodon_ids:
             requested_user_mastodon_ids = requested_user_mastodon_ids[0].mastodon_ids
-        else:
-            requested_user_mastodon_ids = None
+            for mid in requested_user_mastodon_ids:
+                mid.query_exists()
+        requested_user_results = extract_mastodon_ids.Results()
+        extract_mastodon_ids.extract_mastodon_ids_from_users(client, requested_user_resp, requested_user_results, lambda s: True)
+        broken_mastodon_ids = list()
+        for u in requested_user_results.get_results()[0]:
+            for mid in u.mastodon_ids:
+                if mid not in requested_user_mastodon_ids:
+                    broken_mastodon_ids.append(mid)
+                    mid.query_exists()
 
         lists = None
         results = None
@@ -156,6 +174,7 @@ def handle_already_authorised(request, access_credentials):
         context = {
             'action': action,
             'mastodon_id_users': mid_results,
+            'requested_user_broken_mastodon_ids': broken_mastodon_ids,
             'requested_user_mastodon_ids': requested_user_mastodon_ids,
             'keyword_users': extra_results,
             'pseudolists': extract_mastodon_ids.pseudolists,

@@ -1,5 +1,6 @@
 import re
 import tweepy
+import requests
 
 # Max pages of lists to query (1 page is roughly 100 lists)
 max_lists_pages = 5
@@ -38,13 +39,14 @@ pl_muted = Pseudolist('muted', 'Muted accounts', 'get_muted', private = True)
 
 pseudolists = [pl_following, pl_followers, pl_blocked, pl_muted]
 
+_host_heuristic_keywords = ['social', 'masto', 'mastodon']
 
-_forbidden_hosts = {'tiktok.com', 'youtube.com', 'medium.com', 'skeb.jp', 'pronouns.page', 'foundation.app', 'gamejolt.com', 'traewelling.de', 'observablehq.com', 'gmail.com', 'hotmail.com'}
+_forbidden_hosts = {'tiktok.com', 'youtube.com', 'medium.com', 'skeb.jp', 'pronouns.page', 'foundation.app', 'gamejolt.com', 'traewelling.de', 'observablehq.com', 'gmail.com', 'hotmail.com', 'manylink.co', 'withkoji.com', 'twitter.com', 'nomadlist.com'}
 
 # Matches anything of the form @foo@bar.bla or foo@bar.social or foo@social.bar or foo@barmastodonbla
 # We do not match everything of the form foo@bar or foo@bar.bla to avoid false positives like email addresses
-_id_pattern1 = re.compile(r'(@?[\w\-\.]+@[\w\-\.]+\.[\w\-\.]+)', re.IGNORECASE)
-_id_pattern2 = re.compile(r'\b(http://|https://)?([\w\-\.]+\.[\w\-\.]+)/(web/)?@([\w\-\.]+)/?\b', re.IGNORECASE)
+_id_pattern1 = re.compile(r'(@|🐘|Mastodon:?)?\s*?([\w\-\.]+@[\w\-\.]+\.[\w\-\.]+)', re.IGNORECASE)
+_id_pattern2 = re.compile(r'\b((http://|https://)?([\w\-\.]+\.[\w\-\.]+)/(web/)?@([\w\-\.]+))/?\b', re.IGNORECASE)
 _url_pattern = re.compile(r'^(http://|https://)([\w\-\.]+\.[\w\-\.]+)/(web/)?@([\w\-\.]+)/?$', re.IGNORECASE)
 
 def is_forbidden_host(h):
@@ -55,7 +57,8 @@ def is_forbidden_host(h):
 
 def matches_host_heuristic(s):
     xs = s.lower().split('.')
-    if 'social' in xs or 'masto' in xs: return True
+    for kw in _host_heuristic_keywords:
+        if kw in xs: return True
     return None
 
 
@@ -70,16 +73,19 @@ class InstanceValidator:
     def validate_host(self, h):
         s = h.lower()
         if is_forbidden_host(s): return False
-        if self.mode == 'lax': return True
+        if self.mode == 'lax':
+            return True
         b = matches_host_heuristic(s)
-        if b is not None: return b
-        if self.known_host_callback is not None and self.known_host_callback(s): return True
+        if b is not None:
+            return b
+        if self.known_host_callback is not None and self.known_host_callback(s):
+            return True
         return False
     
     # for modes see "is_fediverse_host"
-    def make_mastodon_id(self, u, h):
+    def make_mastodon_id(self, u, h, original = None):
         if self.validate_host(h):
-            return MastodonID(u, h)
+            return MastodonID(u, h, original = original)
         else:
             return None
 
@@ -88,9 +94,11 @@ class InstanceValidator:
 _keyword_pattern = re.compile(r'.*(mastodon|toot|tröt|fedi).*', re.IGNORECASE)
 
 class MastodonID:
-    def __init__(self, user_part, host_part):
+    def __init__(self, user_part, host_part, original = None):
         self.user_part = user_part.lower()
         self.host_part = host_part.lower()
+        self.original = original
+        self.exists = None
 
     def __str__(self):
         return '{}@{}'.format(self.user_part, self.host_part)
@@ -103,6 +111,21 @@ class MastodonID:
         
     def __hash__(self):
         return hash((self.user_part, self.host_part))
+        
+    def query_exists(self):
+        url = f'https://{self.host_part}/.well-known/webfinger?resource=acct:{self}'
+        try:
+            resp = requests.head(url, timeout=1)
+            if resp.status_code == 404:
+                self.exists = False
+            elif resp.status_code == 200:
+                self.exists = True
+            else:
+                self.exists = None
+        except:
+            self.exists = None
+        return self.exists
+        
 
 class UserResult:
     def __init__(self, uid, name, screenname, bio, mastodon_ids, extras):
@@ -186,7 +209,9 @@ class Results:
         extra_results = [r for r in self.results.values() if not r.mastodon_ids and r.extras]
         extra_results.sort(key=(lambda u: u.screenname))
         return mid_results, extra_results
-    
+
+def is_mastodon_id_char(s):
+    return s.isalnum() or s == '_'
     
 # client: a tweepy.Client object
 # requested_user: a tweepy.User object
@@ -200,16 +225,14 @@ def extract_mastodon_ids_from_users(client, resp, results, known_host_callback =
     
     # Takes a Mastodon ID in the format @foo@bar.tld or foo@bar.tld and returns
     # a MastodonID object. If the string starts with an @, lax host validation is performed
-    def parse_mastodon_id(s):
+    def parse_mastodon_id(s, certain = False):
         validator = strict_validator
-        if not s[-1:].isalpha(): s = s[:-1] # remove possible trailing punctuation
-        if s[:1] == '@': # check if first character is @ and remove if yes
-            s = s[1:]
-            validator = lax_validator
+        if not is_mastodon_id_char(s[-1:]): s = s[:-1] # remove possible trailing punctuation
+        if certain: validator = lax_validator
         tmp = s.split('@')
         if len(tmp) != 2:
             return None
-        return validator.make_mastodon_id(tmp[0], tmp[1])
+        return validator.make_mastodon_id(tmp[0], tmp[1], original = s)
 
     users = resp.data
     if 'id' in users: users = [users]    
@@ -237,8 +260,10 @@ def extract_mastodon_ids_from_users(client, resp, results, known_host_callback =
         
         for text in [name, location, bio]:
             if text is None: continue
-            for s in _id_pattern1.findall(text):
-                mid = parse_mastodon_id(s)
+            for prefix, s in _id_pattern1.findall(text):
+                certain = False
+                if prefix: certain = True
+                mid = parse_mastodon_id(s, certain = certain)
                 if mid is not None: mastodon_ids.add(mid)
 
         # Now we check for URLs of the form bar.tld/@foo or bar.tld/web/@foo
@@ -248,22 +273,22 @@ def extract_mastodon_ids_from_users(client, resp, results, known_host_callback =
         # Check URLs in entities of bio, website, pinned tweet for 
         for url in extract_urls_from_user(u) + extract_urls_from_tweet(pinned_tweet):
             for _, h_str, _, u_str in _url_pattern.findall(url):
-                mid = lax_validator.make_mastodon_id(u_str, h_str)
+                mid = strict_validator.make_mastodon_id(u_str, h_str, original = url)
                 if mid is not None: mastodon_ids.add(mid)
 
         # Check for URLs in name and location
         for s in (name, location):
             if s is None: continue
-            for _, h_str, _, u_str in _id_pattern2.findall(s):
-                mid = lax_validator.make_mastodon_id(u_str, h_str)
+            for entire_match, _, h_str, _, u_str in _id_pattern2.findall(s):
+                mid = strict_validator.make_mastodon_id(u_str, h_str, original = entire_match)
                 if mid is not None: mastodon_ids.add(mid)
         
         # Check for URLs in screenname, bio pinned_tweet
         texts = [screenname, bio]
         if pinned_tweet is not None: texts.append(pinned_tweet.text)
         for text in texts:
-            for _, h_str, _, u_str in _id_pattern2.findall(text):
-                mid = lax_validator.make_mastodon_id(u_str, h_str)
+            for entire_match, _, h_str, _, u_str in _id_pattern2.findall(text):
+                mid = strict_validator.make_mastodon_id(u_str, h_str, original = entire_match)
                 if mid is not None: mastodon_ids.add(mid)
                 
         mastodon_ids = list(mastodon_ids)
