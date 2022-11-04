@@ -56,8 +56,8 @@
 <p>{% if is_me %}<a href="https://twitter.com/{{ me.username }}">You</a> have{% else %}<a href="https://twitter.com/{{ requested_user.username }}">@{{ requested_user.username }}</a> has{% endif %} {% if lists %}the following{% else %}no{% endif %} {% if not is_me %}public {% endif %}list{% if list|length != 1%}s{% endif %}.{%if not lists %}</p>{% else %} Select the ones you want to search by clicking the checkboxes next to them.</p>
 <form action="./" method="get">
 <ul class="lists">
-<li><input type="checkbox" id="list_followed" name="list_followed"> <label for="list_followed"><a href="https://twitter.com/{{ requested_user.screenname }}/following" target="_blank">Followed accounts</a></label> ({{ requested_user.public_metrics.following_count }} members)</li>
-<li><input type="checkbox" id="list_followers" name="list_followers"> <label for="list_followers"><a href="https://twitter.com/{{ requested_user.screenname }}/followers" target="_blank">Followers</a></label> ({{ requested_user.public_metrics.followers_count }} members)</li>
+<li><input type="checkbox" id="list_followed" name="list_followed"> <label for="list_followed"><a href="https://twitter.com/{{ requested_user.username }}/following" target="_blank">Followed accounts</a></label> ({{ requested_user.public_metrics.following_count }} members)</li>
+<li><input type="checkbox" id="list_followers" name="list_followers"> <label for="list_followers"><a href="https://twitter.com/{{ requested_user.username }}/followers" target="_blank">Followers</a></label> ({{ requested_user.public_metrics.followers_count }} members)</li>
 {% if is_me %}
 <li><input type="checkbox" id="list_blocked" name="list_blocked"> <label for="list_blocked"><a href="https://twitter.com/settings/blocked/all" target="_blank">Blocked accounts</a></label></li>
 <li><input type="checkbox" id="list_muted" name="list_muted"> <label for="list_muted"><a href="https://twitter.com/settings/muted/all" target="_blank">Muted accounts</a></label></li>
