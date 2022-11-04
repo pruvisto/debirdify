@@ -1,14 +1,42 @@
 import re
 import tweepy
 
-# Max pages of followees to query (1 page is roughly 1000 followees)
-max_followee_pages = 10
-
 # Max pages of lists to query (1 page is roughly 100 lists)
 max_lists_pages = 5
 
 # Max pages of list members to query (1 page is roughly 100 members)
 max_list_member_pages = 200
+
+class List:
+    def __init__(self, id, name, member_count):
+        self.id = id
+        self.name = name
+        self.member_count = member_count
+
+    def __eq__(self, other):
+        return self.id == other.id
+
+    def __hash__(self):
+        return hash(self.id)
+
+    def __str__(self):
+        return self.name
+
+class Pseudolist(List):
+    def __init__(self, id, name, api_call, private = False, max_results = 1000, page_limit = 15):
+        super(Pseudolist, self).__init__(id, name, None)
+        self.private = private
+        self.max_results = max_results
+        self.page_limit = page_limit
+        self.api_call = api_call
+       
+
+pl_following = Pseudolist('following', 'Followed accounts', 'get_users_following')
+pl_followers = Pseudolist('followers', 'Followers', 'get_users_followers')
+pl_blocked = Pseudolist('blocked', 'Blocked accounts', 'get_blocked', private = True)
+pl_muted = Pseudolist('muted', 'Muted accounts', 'get_muted', private = True)
+
+pseudolists = [pl_following, pl_followers, pl_blocked, pl_muted]
 
 
 _forbidden_hosts = {'tiktok.com', 'youtube.com', 'medium.com', 'skeb.jp', 'pronouns.page', 'foundation.app', 'gamejolt.com', 'traewelling.de', 'observablehq.com', 'gmail.com'}
@@ -119,24 +147,16 @@ def extract_urls_from_tweet(t):
     if t is None or t.entities is None or 'urls' not in t.entities: return []
     return [x['expanded_url'] for x in t.entities['urls'] if 'expanded_url' in x]
 
-class List:
-    def __init__(self, id, name):
-        self.id = id
-        self.name = name
-        
-    def __str__(self):
-        return self.name
-
 def get_lists(client, requested_user):
     next_token = None
     results = list()
     page = 1
     while page <= max_lists_pages:
         page += 1
-        resp = client.get_owned_lists(requested_user.id, user_auth=True, user_fields='id', pagination_token=next_token)
+        resp = client.get_owned_lists(requested_user.id, user_auth=True, user_fields='id', list_fields=['member_count'], pagination_token=next_token)
         lists = resp.data or []
         for lst in lists:
-            results.append(List(lst.id, lst.name))
+            results.append(List(lst.id, lst.name, lst.member_count))
         try:
           next_token = resp.meta['next_token']
         except:
@@ -256,21 +276,31 @@ def extract_mastodon_ids_from_users(client, resp, results, known_host_callback =
         
         results.add(UserResult(uid, name, screenname, bio, mastodon_ids, extras))
 
-def extract_mastodon_ids(client, requested_user, known_host_callback = None):
+def extract_mastodon_ids_from_pseudolist(client, requested_user, pl, known_host_callback = None):
     next_token = None
     pages = 1
     tweet_rate_limit_hit = False
     results = Results()
 
-    while pages <= max_followee_pages:
-        resp = client.get_users_following(
-            requested_user.id, 
-            max_results=1000, 
-            user_auth=True, 
-            user_fields=['name', 'username', 'description', 'entities', 'location', 'pinned_tweet_id'],
-            tweet_fields=['entities'], 
-            expansions='pinned_tweet_id', 
-            pagination_token=next_token)
+    while pages <= pl.page_limit:
+        api_call = getattr(client, pl.api_call)
+        if pl.private:
+            resp = api_call(
+                max_results=pl.max_results, 
+                user_auth=True, 
+                user_fields=['name', 'username', 'description', 'entities', 'location', 'pinned_tweet_id'],
+                tweet_fields=['entities'], 
+                expansions='pinned_tweet_id', 
+                pagination_token=next_token)
+        else:
+            resp = api_call(
+                requested_user.id, 
+                max_results=pl.max_results, 
+                user_auth=True, 
+                user_fields=['name', 'username', 'description', 'entities', 'location', 'pinned_tweet_id'],
+                tweet_fields=['entities'], 
+                expansions='pinned_tweet_id', 
+                pagination_token=next_token)
 
         try:
           next_token = resp.meta['next_token']

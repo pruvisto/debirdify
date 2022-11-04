@@ -54,12 +54,12 @@ def handle_already_authorised(request, access_credentials):
             access_token_secret=access_credentials[1]
         )
 
-        me = client.get_me(user_auth=True).data
+        me = client.get_me(user_auth=True, user_fields=['public_metrics']).data
 
         if 'screenname' in request.GET:
             screenname = request.GET['screenname']
             if screenname[:1] == '@': screenname = screenname[1:]
-            requested_user = client.get_user(username=screenname, user_auth=True).data
+            requested_user = client.get_user(username=screenname, user_auth=True, user_fields=['public_metrics']).data
             is_me = (requested_user.id == me.id)
         else:
             screenname=me.username
@@ -95,25 +95,41 @@ def handle_already_authorised(request, access_credentials):
 
         if 'getfollowed' in request.GET:
             action = 'getfollowed'
-            results = extract_mastodon_ids.extract_mastodon_ids(
-                client, requested_user, known_host_callback = known_host_callback)
+            results = extract_mastodon_ids.extract_mastodon_ids_from_pseudolist(
+                client, requested_user, extract_mastodon_ids.pl_following, known_host_callback = known_host_callback)
+        elif 'getfollowers' in request.GET:
+            action = 'getfollowers'
+            results = extract_mastodon_ids.extract_mastodon_ids_from_pseudolist(
+                client, requested_user, extract_mastodon_ids.pl_followers, known_host_callback = known_host_callback)
+        elif 'getblocked' in request.GET:
+            action = 'getblocked'
+            results = extract_mastodon_ids.extract_mastodon_ids_from_pseudolist(
+                client, requested_user, extract_mastodon_ids.pl_blocked, known_host_callback = known_host_callback)
+        elif 'getmuted' in request.GET:
+            action = 'getmuted'
+            results = extract_mastodon_ids.extract_mastodon_ids_from_pseudolist(
+                client, requested_user, extract_mastodon_ids.pl_muted, known_host_callback = known_host_callback)
         elif 'getlists' in request.GET:
             action = 'getlists'
             lists = extract_mastodon_ids.get_lists(client, requested_user)
         elif 'getlist' in request.GET:
             action = 'getlist'
             lists = extract_mastodon_ids.get_lists(client, requested_user)
-            requested_lists = [lst for lst in lists if ('list_%s' % lst.id) in request.GET]
-            requested_list_ids = [lst.id for lst in requested_lists]
-            if 'list_followed' in request.GET:
-                results_followed = extract_mastodon_ids.extract_mastodon_ids(
-                    client, requested_user, known_host_callback = known_host_callback)
-            else:
-                results_followed = None
+            requested_lists = [lst for lst in extract_mastodon_ids.pseudolists + lists if ('list_%s' % lst.id) in request.GET]
+            requested_list_ids = [lst.id for lst in requested_lists if not isinstance(lst, extract_mastodon_ids.Pseudolist)]
+            
+            other_results = dict()
+            for pl in extract_mastodon_ids.pseudolists:
+                if f'list_{pl.id}' in request.GET:
+                    other_results[pl] = extract_mastodon_ids.extract_mastodon_ids_from_pseudolist(
+                        client, requested_user, pl, known_host_callback = known_host_callback)
+                
             results = extract_mastodon_ids.extract_mastodon_ids_from_lists(client, requested_list_ids, known_host_callback=known_host_callback)
-            if results_followed is not None:
-                results_followed.merge(results)
-                results = results_followed
+            
+            for pl in extract_mastodon_ids.pseudolists:
+                if pl in other_results:
+                    other_results[pl].merge(results)
+                    results = other_results[pl]
                 
         if results is not None:
             mid_results, extra_results = results.get_results()
@@ -128,6 +144,7 @@ def handle_already_authorised(request, access_credentials):
             'action': action,
             'mastodon_id_users': mid_results,
             'keyword_users': extra_results,
+            'pseudolists': extract_mastodon_ids.pseudolists,
             'requested_user': requested_user, 
             'requested_name': screenname, 
             'requested_lists': requested_lists,
@@ -144,6 +161,7 @@ def handle_already_authorised(request, access_credentials):
         context = {
           'error_message': 'You made too many requests too quickly. Please slow down a bit. This is not us being petty; Twitter enforces per-user rate limiting. This can happen especially if you repeatedly search through hundreds or thousands of accounts.',
           'requested_name': screenname,
+          'pseudolists': extract_mastodon_ids.pseudolists,
           'mastodon_id_users': [],
           'keyword_users': [],
           'n_users_searched': 0,
@@ -154,7 +172,9 @@ def handle_already_authorised(request, access_credentials):
         }
         response = render(request, "displayresults.html", context)
         return response
-    except (tweepy.BadRequest, tweepy.NotFound):
+    except (tweepy.BadRequest, tweepy.NotFound) as e:
+        print(e)
+        traceback.print_exc()
         if 'screenname' in request.GET:
             screenname = request.GET['screenname']
             if screenname[:1] == '@': screenname = screenname[1:]
@@ -163,6 +183,7 @@ def handle_already_authorised(request, access_credentials):
         context = {
           'error_message': 'The Twitter API rejected our request. Are you sure what you entered is a valid Twitter handle? (e.g. @pruvisto)',
           'requested_name': screenname,
+          'pseudolists': extract_mastodon_ids.pseudolists,
           'mastodon_id_users': [],
           'keyword_users': [],
           'n_users_searched': 0,

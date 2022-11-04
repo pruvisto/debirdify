@@ -7,7 +7,7 @@
 <label for="screenname">Twitter username:</label>&nbsp;
 <input type="text" id="screenname" name="screenname" value="@{% if is_me %}{{ me.username }}{% else %}{{ requested_name }}{% endif %}"></td>
 <br><br>
-<input type="submit" value="Search followed accounts" name="getfollowed">&nbsp;&nbsp;<input type="submit" value="Retrieve lists" name="getlists">
+<input type="submit" value="Search followed accounts" name="getfollowed">&nbsp;&nbsp;<input type="submit" value="Search followers" name="getfollowers">&nbsp;&nbsp;<input type="submit" value="Search blocked accounts" name="getblocked">&nbsp;&nbsp;<input type="submit" value="Search muted accounts" name="getmuted">&nbsp;&nbsp;<input type="submit" value="Advanced: Retrieve lists" name="getlists">
 </form>
 
 {% if error_message is not none %}
@@ -17,26 +17,57 @@
 <h2>Results</h2>
 
 {% if requested_user is none %}
-<p>There is no user called @{{requested_name}}.</p>
+	<p>There is no user called @{{requested_name}}.</p>
 {% else %}
-{% if action == 'getfollowed' or action == 'getlist' %}
-{% if mastodon_id_users or keyword_users %}
-<p>Good news! Some of the people {% if requested_lists is none %}{% if is_me %}you follow{% else %}@{{ requested_user.username }} follows{% endif %}{% else %} in {% if is_me %}your{% else %}@{{ requested_user.username }}'s{% endif %} lists{% endif %} seem to have a Fediverse account:</p>
-{% else %}
-<p>Sadly, none of the people {% if is_me %}<a href="https://twitter.com/{{ me.username }}">you</a> follow{% else %}<a href="https://twitter.com/{{ requested_user.username }}">@{{ requested_user.username }}</a> follows{% endif %} seem to have a Mastodon account.</p>
-{% endif %}
-{% endif %}
+	{% if action != 'getlists' %}
+	<p>
+	  {% if action == 'getlist' and not requested_lists %}
+	  	<span style="font-weight: bold">Error:</span> You did not select any lists to search.
+	  {% else %}
+	    {% if action == 'getlist' %}<p>Lists that were searched: {{ requested_lists|join:', ' }}</p>{% endif %}
+	  
+			{% if mastodon_id_users or keyword_users %}Some of the people{% else %}None of the people{% endif %} 
+			{% if action == 'getfollowers' %}
+				{% if is_me %}
+					that follow <a href="https://twitter.com/{{ me.username }}">you</a>
+				{% else %}
+					that follow <a href="https://twitter.com/{{ requested_user.username }}">@{{ requested_user.username }}</a>
+				{% endif %}
+			{% elif action == 'getfollowed' %}
+				{% if is_me %}
+					<a href="https://twitter.com/{{ me.username }}">you</a> follow
+				{% else %}
+					<a href="https://twitter.com/{{ requested_user.username }}">@{{ requested_user.username }}</a> follows
+				{% endif %}
+			{% elif action == 'getblocked' %}
+         you blocked
+			{% elif action == 'getmuted' %}
+				 you muted
+			{% else %}
+				in the selected lists
+			{% endif %}
+			seem to have a Mastodon account.
+	  {% endif %}
+	</p>
+	{% endif %}
 {% endif %}
 
-{% if action == 'getlists' %}
-<p>{% if is_me %}You have{% else %}@{{ requested_name }} has{% endif %} {% if lists %}the following{% else %}no{% endif %} {% if not is_me %}public {% endif %}list{% if list|length != 1%}s{% endif %}.{%if not lists %}</p>{% else %} Select the ones you want to search by clicking the checkboxes next to them.</p>
+{% if action == 'getlists' or action == 'getlist' and not requested_lists %}
+<p>{% if is_me %}<a href="https://twitter.com/{{ me.username }}">You</a> have{% else %}<a href="https://twitter.com/{{ requested_user.username }}">@{{ requested_user.username }}</a> has{% endif %} {% if lists %}the following{% else %}no{% endif %} {% if not is_me %}public {% endif %}list{% if list|length != 1%}s{% endif %}.{%if not lists %}</p>{% else %} Select the ones you want to search by clicking the checkboxes next to them.</p>
 <form action="./" method="get">
 <ul class="lists">
-<li><input type="checkbox" id="list_followed" name="list_followed"> <label for="list_followed"><a href="https://twitter.com/{{ requested_user.screenname }}/following" target="_blank">Followed accounts</a></label></li>
+<li><input type="checkbox" id="list_followed" name="list_followed"> <label for="list_followed"><a href="https://twitter.com/{{ requested_user.screenname }}/following" target="_blank">Followed accounts</a></label> ({{ requested_user.public_metrics.following_count }} members)</li>
+<li><input type="checkbox" id="list_followers" name="list_followers"> <label for="list_followers"><a href="https://twitter.com/{{ requested_user.screenname }}/followers" target="_blank">Followers</a></label> ({{ requested_user.public_metrics.followers_count }} members)</li>
+{% if is_me %}
+<li><input type="checkbox" id="list_blocked" name="list_blocked"> <label for="list_blocked"><a href="https://twitter.com/settings/blocked/all" target="_blank">Blocked accounts</a></label></li>
+<li><input type="checkbox" id="list_muted" name="list_muted"> <label for="list_muted"><a href="https://twitter.com/settings/muted/all" target="_blank">Muted accounts</a></label></li>
+{% endif %}
 {% for lst in lists %}
-<li><input type="checkbox" id="list_{{ lst.id }}" name="list_{{ lst.id }}"> <label for="list_{{ lst.id }}"><a href="https://twitter.com/i/lists/{{ lst.id|urlencode }}" target="_blank">{{ lst.name }}</a></label></li>
+<li><input type="checkbox" id="list_{{ lst.id }}" name="list_{{ lst.id }}"> <label for="list_{{ lst.id }}"><a href="https://twitter.com/i/lists/{{ lst.id|urlencode }}" target="_blank">{{ lst.name }}</a></label> ({{ lst.member_count }} members)</li>
 {% endfor %}
 </ul>
+<p><span style="font-weight: bold">Note:</span> For very large lists (several thousand members), not all members might be searched due to rate limiting issues.</p>
+
 <input type="hidden" name="screenname" value="{{requested_name}}">
 <input type="submit" name="getlist" value="Search lists">
 </form>
@@ -60,7 +91,7 @@
 
 
 <h2>CSV Export</h2>
-<p><a id="export"></a>You can bulk-follow all the above accounts on Fediverse by downloading the CSV file below and importing it e.g. on Mastodon under Settings → Import and Export → Import. Make sure to select ‘merge’, not ‘overwrite’.</p>
+<p><a id="export"></a>You can bulk-follow, bulk-block, etc. all the above accounts on Fediverse by downloading the CSV file below and importing it e.g. on Mastodon under Settings → Import and Export → Import. Make sure to select ‘merge’, not ‘overwrite’.</p>
 <p style="margin-bottom: 2em">
 <a class="button" href="data:text/plain;charset=utf-8,{{ csv|urlencode }}" download="following_accounts.csv">Download CSV Export</a>
 </p>
