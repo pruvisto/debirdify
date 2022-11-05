@@ -5,7 +5,7 @@
 <p>This may take a few seconds if the requested lists contain a lot of people – be patient and do not refresh the page too quickly.</p>
 <form action="./" method="get">
 <label for="screenname">Twitter username:</label>&nbsp;
-<input type="text" id="screenname" name="screenname" value="@{% if is_me %}{{ me.username }}{% else %}{{ requested_name }}{% endif %}"></td>
+<input type="text" id="screenname" name="screenname" value="@{% if is_me %}{{ me.username }}{% else %}{{ requested_name }}{% endif %}">
 <br><br>
 <input type="submit" value="Search followed accounts" name="getfollowed">&nbsp;&nbsp;<input type="submit" value="Search followers" name="getfollowers">&nbsp;&nbsp;<input type="submit" value="Search blocked accounts" name="getblocked">&nbsp;&nbsp;<input type="submit" value="Search muted accounts" name="getmuted">&nbsp;&nbsp;<input type="submit" value="Advanced: Retrieve lists" name="getlists">
 </form>
@@ -115,13 +115,16 @@ function goto_instance(i) {
 
 {% if most_relevant_instances %}
 <h2>Most Relevant Instances</h2>
+<p>
+The following ranking shows the instances that Debirdify considers most relevant to {% if is_me %}you{% else %}@{{requested_name}}{% endif %} based on the Fediverse accounts we found according to your query.
+</p>
 <table style="width: 100%; border: none; margin-left: 0.5em">
 {% for inst in most_relevant_instances %}
 <tr class="ranking_row" onclick="goto_instance({{ inst.index }})">
 <td><a href="#instance_{{ inst.index_plus_one }}">{{ inst.host }}</a></td>
 <td style="width: 100%; padding-left: 1em"><div class="ranking_bar" style="width: {{ inst.rel_score|floatformat:0 }}%; height: 1em; background-color: #88f; border-radius: 0.2em;"></div></td>
 <td style="padding-left: 1em; padding-right: 2em; text-align: right">{{ inst.score|floatformat:2 }}</td>
-<tr>
+</tr>
 {% endfor %}
 </table>
 <script>
@@ -222,5 +225,4 @@ mkChart('service_distribution', 'service_distribution_container', 'Service Distr
 </p>
 
 {% include "footer.html" %}
-</body>
 </html>
