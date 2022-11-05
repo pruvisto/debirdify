@@ -2,6 +2,7 @@ from django.shortcuts import render
 from django.http import HttpResponse
 from django.conf import settings
 from django.views.decorators.gzip import gzip_page
+from django.db import connection
 import tweepy
 import sqlite3
 from . import extract_mastodon_ids
@@ -114,13 +115,11 @@ class Instance:
 def naked_instance(name):
     return Instance(name.lower(), None, None, None, None, None, None, None, None, None, None, None)
 
-def get_instance(conn, name):
-    if conn is None: return naked_instance(name)
+def get_instance(name):
     try:
-        cur = conn.cursor()
-        cur.execute('SELECT name, software, software_version, registrations_open, users, active_month, active_halfyear, local_posts, last_update, uptime, dead, up FROM instances WHERE name=? LIMIT 1', (name.lower(),))
-        row = cur.fetchone()
-        cur.close()
+        with connection.cursor() as cur:
+            cur.execute('SELECT name, software, software_version, registrations_open, users, active_month, active_halfyear, local_posts, last_update, uptime, dead, up FROM instances WHERE name=%s LIMIT 1', [name.lower()])
+            row = cur.fetchone()
         if row is None: return naked_instance(name)
         i = Instance(row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8], row[9], row[10], row[11])
         return i
@@ -162,11 +161,10 @@ def handle_auth_request(request):
 def make_csv(users):
     return '\n'.join(['Account address,Show boosts'] + ["{},true".format(mid) for u in users for mid in u.mastodon_ids])
 
-def increase_access_counter(db):
-    if db is None: return
+def increase_access_counter():
     try:
-        db.execute("INSERT INTO access_stats (date, count) VALUES (DATE('now'), 1) ON CONFLICT DO UPDATE SET count = count + 1")
-        db.commit()
+        connection.execute("INSERT INTO access_stats (date, count) VALUES (DATE('now'), 1) ON CONFLICT DO UPDATE SET count = count + 1")
+        connection.commit()
     except:
         pass
 
@@ -197,32 +195,21 @@ def handle_already_authorised(request, access_credentials):
             requested_user_resp = me_resp
             is_me = True
 
-        if settings.INSTANCE_DB is not None:
-            try:
-                instance_db = sqlite3.connect(settings.INSTANCE_DB)
-            except Exception as e:
-                instance_db = None 
-        else:
-            instance_db = None
-
         def known_host_callback(s):
-            if instance_db is None:
-                return False
             try:
-                cursor = instance_db.cursor()
-                row = cursor.execute('SELECT name FROM instances WHERE name=? LIMIT 1', (s,)).fetchone()
-                cursor.close()
+                with connection.cursor() as cur:
+                    row = cur.execute('SELECT name FROM instances WHERE name=%s LIMIT 1', [s]).fetchone()
                 if row is None:
                     try:
-                        instance_db.execute('INSERT INTO unknown_hosts (name) VALUES (?);', (s,))
-                        instance_db.commit()
+                        connection.execute('INSERT INTO unknown_hosts (name) VALUES (%s);', [s])
+                        connection.commit()
                     except:
                         pass
                 else:
                     return True
             except:
                 return False
-                
+
         broken_mastodon_ids = []
         requested_user_mastodon_ids = []
         requested_user_results = extract_mastodon_ids.Results()
@@ -291,7 +278,7 @@ def handle_already_authorised(request, access_credentials):
             action_taken = False
 
         if action_taken:
-            increase_access_counter(instance_db)
+            increase_access_counter()
 
         if results is not None:
             mid_results, extra_results = results.get_results()
@@ -304,7 +291,7 @@ def handle_already_authorised(request, access_credentials):
                     mastodon_ids_by_instance[mid.host_part].append((u, mid))
                 else:
                     mastodon_ids_by_instance[mid.host_part] = [(u, mid)]
-        mastodon_ids_by_instance = {get_instance(instance_db, i): us for i, us in mastodon_ids_by_instance.items()}
+        mastodon_ids_by_instance = {get_instance(i): us for i, us in mastodon_ids_by_instance.items()}
         mastodon_ids_by_instance_list = sorted(mastodon_ids_by_instance.items(), key = lambda x: x[0].compare_key(x[1]))
         tmp = 0
         for inst, _ in mastodon_ids_by_instance_list:
@@ -345,11 +332,6 @@ def handle_already_authorised(request, access_credentials):
         else:
             max_score = 0.0
         
-        try:
-            if instance_db is not None: instance_db.close()
-        except:
-            pass
-                    
         context = {
             'action': action,
             'mastodon_id_users': mid_results,
