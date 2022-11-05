@@ -162,6 +162,14 @@ def handle_auth_request(request):
 def make_csv(users):
     return '\n'.join(['Account address,Show boosts'] + ["{},true".format(mid) for u in users for mid in u.mastodon_ids])
 
+def increase_access_counter(db):
+    if db is None: return
+    try:
+        db.execute("INSERT INTO access_stats (date, count) VALUES (DATE('now'), 1) ON CONFLICT DO UPDATE SET count = count + 1")
+        db.commit()
+    except:
+        pass
+
 def handle_already_authorised(request, access_credentials):
     screenname = ''
     try:
@@ -240,6 +248,7 @@ def handle_already_authorised(request, access_credentials):
         requested_lists = None
         action = None
         n_users = None
+        action_taken = True
 
         if 'getfollowed' in request.GET:
             action = 'getfollowed'
@@ -278,7 +287,12 @@ def handle_already_authorised(request, access_credentials):
                 if pl in other_results:
                     other_results[pl].merge(results)
                     results = other_results[pl]
-                
+        else:
+            action_taken = False
+
+        if action_taken:
+            increase_access_counter(instance_db)
+
         if results is not None:
             mid_results, extra_results = results.get_results()
             n_users = results.n_users
