@@ -235,6 +235,7 @@ def is_mastodon_id_char(s):
 #   the first component contains a list of users that seem to have a Mastodon ID in their name or bio
 #   the second component contains a list of users that have some keyword in their bio that looks Mastodon-related
 def extract_mastodon_ids_from_users(client, resp, results, known_host_callback = None):
+    if resp.data is None: return
     lax_validator = InstanceValidator(known_host_callback=known_host_callback, mode = 'lax')
     strict_validator = InstanceValidator(known_host_callback=known_host_callback, mode = 'strict')
     
