@@ -162,11 +162,12 @@ def make_csv(users):
     return '\n'.join(['Account address,Show boosts'] + ["{},true".format(mid) for u in users for mid in u.mastodon_ids])
 
 def increase_access_counter():
-    try:
-        with connection.cursor() as cur:
-            cur.execute("INSERT INTO access_stats (date, count) VALUES (DATE('now'), 1) ON CONFLICT DO UPDATE SET count = count + 1")
-    except Exception as e:
-        print('Failed to increase access counter:', e)
+    pass
+#    try:
+#        with connection.cursor() as cur:
+#            cur.execute("INSERT INTO access_stats (date, count) VALUES (DATE('now'), 1) ON CONFLICT DO UPDATE SET count = count + 1")
+#    except Exception as e:
+#        print('Failed to increase access counter:', e)
 
 def handle_already_authorised(request, access_credentials):
     screenname = ''
