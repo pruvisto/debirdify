@@ -73,6 +73,8 @@ class Instance:
         if self.users is not None:
             stats = f'users: {self.users}'
             tmp = list()
+            # uptime is broken in instances.social
+#            for x, y in [('active_month', 'last month'), ('active_halfyear', 'last 6 months'), ('uptime', 'uptime')]:
             for x, y in [('active_month', 'last month'), ('active_halfyear', 'last 6 months'), ('uptime', 'uptime')]:
                 z = getattr(self, x)
                 if z is None: continue
