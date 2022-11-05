@@ -165,8 +165,8 @@ def increase_access_counter():
     try:
         connection.execute("INSERT INTO access_stats (date, count) VALUES (DATE('now'), 1) ON CONFLICT DO UPDATE SET count = count + 1")
         connection.commit()
-    except:
-        pass
+    except Exception as e:
+        print('Failed to increase access counter:', e)
 
 def handle_already_authorised(request, access_credentials):
     screenname = ''
