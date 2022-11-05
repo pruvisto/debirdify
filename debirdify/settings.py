@@ -51,7 +51,7 @@ TWITTER_CONSUMER_CREDENTIALS = [x.strip() for x in env('DEBIRDIFY_CONSUMER_CREDE
 if len(TWITTER_CONSUMER_CREDENTIALS) != 2:
     raise MissingEnvVariable('DEBIRDIFY_CONSUMER_CREDENTIALS')
 TWITTER_CREDENTIALS_COOKIE = env('DEBIRDIFY_ACCESS_CREDENTIALS_COOKIE', 'twitter_access_credentials')
-INSTANCE_DB = env('DEBIRDIFY_INSTANCE_DB', obligatory=False)
+INSTANCE_DB = env('DEBIRDIFY_INSTANCE_DB', default = BASE_DIR / "db.sqlite3")
 
 # Application definition
 
@@ -104,7 +104,7 @@ WSGI_APPLICATION = "debirdify.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.sqlite3",
-        "NAME": BASE_DIR / "db.sqlite3",
+        "NAME": INSTANCE_DB,
     }
 }
 
