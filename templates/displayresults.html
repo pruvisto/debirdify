@@ -137,7 +137,26 @@ Array.from(document.getElementsByClassName('ranking_row')).forEach(elem => elem.
 <script>
 const instance_dist_labels = [{% for i, us in mastodon_ids_by_instance %}'{{ i.host|addslashes }}',{% endfor %}];
 const instance_dist_vals = [{% for i, us in mastodon_ids_by_instance %}{{ us|length }},{% endfor %}];
-mkChart('instance_distribution', 'instance_distribution_container', 'Instance Distribution', instance_dist_labels, instance_dist_vals, goto_instance);
+const instance_scores = [{% for i, us in mastodon_ids_by_instance %}{% if i.score is not null %}{{i.score}}{% else %}null{% endif %},{% endfor %}]
+const instance_users = [{% for i, us in mastodon_ids_by_instance %}{% if i.users is not null %}{{i.users}}{% else %}null{% endif %},{% endfor %}]
+function mk_label(i) {
+    var label = instance_dist_labels[i];
+    var has_extras = false;
+    var extras = "";
+    if (instance_users[i] != null) {
+        extras += instance_users[i] + ' users';
+        has_extras = true;
+    }
+    if (instance_scores[i] != null) {
+        if (has_extras) extras += ', ';
+        extras += 'relevance score: ' + instance_scores[i].toFixed(2);
+        has_extras = true;
+    }
+    if (has_extras)
+        label = label + ' (' + extras + ')';
+    return label;
+}
+mkChart('instance_distribution', 'instance_distribution_container', 'Instance Distribution', instance_dist_labels, instance_dist_vals, goto_instance, mk_label);
 </script>
 {% endif %}
 
@@ -146,7 +165,7 @@ mkChart('instance_distribution', 'instance_distribution_container', 'Instance Di
 <script>
 const service_dist_labels = [{% for serv, n in service_stats %}'{{ serv|addslashes }}',{% endfor %}];
 const service_dist_vals = [{% for serv, n in service_stats %}{{ n }},{% endfor %}];
-mkChart('service_distribution', 'service_distribution_container', 'Service Distribution', service_dist_labels, service_dist_vals, null);
+mkChart('service_distribution', 'service_distribution_container', 'Service Distribution', service_dist_labels, service_dist_vals, null, null);
 </script>
 {% endif %}
 
