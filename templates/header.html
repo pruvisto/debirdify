@@ -10,7 +10,7 @@
 <link rel="stylesheet" href="https://pruvisto.org/debirdify_static/style.css">
 <script src="https://pruvisto.org/debirdify_static/chart.min.js"></script>
 <script>
-function mkChart(id, container_id, title, labels, vals, click_callback) {
+function mkChart(id, container_id, title, labels, vals, click_callback, mk_label) {
     const div = document.getElementById(container_id)
 
     const h2 = document.createElement('h2');
@@ -38,11 +38,13 @@ function mkChart(id, container_id, title, labels, vals, click_callback) {
         label: title,
         data: vals,
         hoverOffset: 4,
+        borderColor: 'rgb(255,255,255)',
         backgroundColor: colors,
         hoverBackgroundColor: hoverColors,
+        borderWidth: 1
       }]
     };
-
+    
     const myChart = new Chart(canvas.id, {
       type: "doughnut",
       data: data,
@@ -51,6 +53,25 @@ function mkChart(id, container_id, title, labels, vals, click_callback) {
           plugins: {
               legend: {
                     display: false
+              },
+              tooltip: {
+                  borderWidth: 0,
+                  usePointStyle: true,
+                  callbacks: {
+                      labelColor: function(context) {
+                        return {borderWidth: 0, backgroundColor: colors[context.dataIndex], borderColor: colors[context.dataIndex]};
+                        },
+                      label: 
+                          function(context) {
+                              const i = context.dataIndex;
+                              if (i < 0 || i >= n) return null;
+                              if (mk_label != null) {
+                                  return mk_label(i);
+                              } else {
+                                  return labels[i];
+                              }
+                          }
+                  }
               }
           },
           onClick: (a, b) => {
