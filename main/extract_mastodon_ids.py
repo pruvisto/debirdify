@@ -115,7 +115,7 @@ class MastodonID:
     def query_exists(self):
         url = f'https://{self.host_part}/.well-known/webfinger?resource=acct:{self}'
         try:
-            resp = requests.head(url, timeout=1)
+            resp = requests.head(url, timeout=1, allow_redirects=True)
             if resp.status_code == 404:
                 self.exists = False
             elif resp.status_code == 200:
