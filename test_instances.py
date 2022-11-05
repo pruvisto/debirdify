@@ -13,7 +13,7 @@ max_failures = 3
 timeout = 10
 overall_timeout = 3600
 
-max_workers = 8
+max_workers = 1
 if 'DEBIRDIFY_TEST_INSTANCE_WORKERS' in os.environ:
     max_workers = os.environ['DEBIRDIFY_TEST_INSTANCE_WORKERS']
 
@@ -27,8 +27,8 @@ db_file = env(env_db_file)
 con = sqlite3.connect(db_file)
 cur = con.cursor()
 cur.execute('SELECT name, failures FROM unknown_hosts')
-
 hosts = cur.fetchall()
+cur.close()
 
 max_nodeinfo_tries = 3
 

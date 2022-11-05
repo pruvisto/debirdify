@@ -18,6 +18,7 @@ db_file = env(env_db_file)
 api_token = env(env_api_token)
 
 response = requests.get(url=api_endpoint, headers = {'authorization': 'Bearer ' + api_token}, allow_redirects=True)
+
 data = response.json()
 if 'instances' not in data:
     print('Invalid instance list.')
@@ -33,8 +34,8 @@ def parse_instance(dat):
         registrations_open = dat['open_registrations']
         users = dat['users']
         return (name, dead, up, uptime, last_update, registrations_open, users)
-    except:
-        print('Error parsing JSON:', dat)
+    except Exception as e:
+        print('Error parsing JSON:', e)
         return None
     
 instances = [i for dat in data['instances'] if (i := parse_instance(dat)) is not None]

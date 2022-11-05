@@ -12,7 +12,7 @@ env_db_file = 'DEBIRDIFY_INSTANCE_DB'
 
 max_failures = 3
 overall_timeout = 3600
-max_workers = 4
+max_workers = 1
 timeout = 5
 instance_limit = 200
 if 'DEBIRDIFY_TEST_INSTANCE_WORKERS' in os.environ:
@@ -32,6 +32,7 @@ cur.execute("SELECT name FROM instances WHERE last_update is NULL OR last_update
 #cur.execute("SELECT name FROM instances")
 
 hosts = cur.fetchall()
+cur.close()
 
 max_nodeinfo_tries = 5
 

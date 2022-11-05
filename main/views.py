@@ -120,6 +120,7 @@ def get_instance(conn, name):
         cur = conn.cursor()
         cur.execute('SELECT name, software, software_version, registrations_open, users, active_month, active_halfyear, local_posts, last_update, uptime, dead, up FROM instances WHERE name=? LIMIT 1', (name.lower(),))
         row = cur.fetchone()
+        cur.close()
         if row is None: return naked_instance(name)
         i = Instance(row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8], row[9], row[10], row[11])
         return i
@@ -191,19 +192,18 @@ def handle_already_authorised(request, access_credentials):
         if settings.INSTANCE_DB is not None:
             try:
                 instance_db = sqlite3.connect(settings.INSTANCE_DB)
-                cursor = instance_db.cursor()
             except Exception as e:
                 instance_db = None 
-                cursor = None
         else:
             instance_db = None
-            cursor = None
 
         def known_host_callback(s):
-            if cursor is None:
+            if instance_db is None:
                 return False
             try:
-                row = cursor.execute('SELECT name FROM instances WHERE name=?', (s,)).fetchone()
+                cursor = instance_db.cursor()
+                row = cursor.execute('SELECT name FROM instances WHERE name=? LIMIT 1', (s,)).fetchone()
+                cursor.close()
                 if row is None:
                     try:
                         instance_db.execute('INSERT INTO unknown_hosts (name) VALUES (?);', (s,))
