@@ -179,7 +179,7 @@ mkChart('service_distribution', 'service_distribution_container', 'Service Distr
   <a id="instance_{{ forloop.counter }}"></a>
   {% if i.icon %}<img src="https://pruvisto.org/debirdify_static/service_icons/{{ i.icon }}" title="{{i.software|title}}" alt="{{i.software|title}}" style="height: 2.5ex; margin-right: 2pt; vertical-align: baseline" class="server_icon">
   {% else %}
-  <img src="https://pruvisto.org/debirdify_static/service_icons/unknown.svg" title="{{i.software|title}}" alt="{{i.software|title}}" style="height: 2.5ex; margin-right: 2pt" class="server_icon">
+  <img src="https://pruvisto.org/debirdify_static/service_icons/unknown.svg" title="Unknown service" alt="Unknown service" style="height: 2.5ex; margin-right: 2pt" class="server_icon">
   {% endif %}
   <span style="font-weight: bold; font-size: 140%;">
   <a style="margin-right: 2pt; text-decoration: none; color: inherit" href="https://{{ i.host|urlencode }}" target="_blank">{{ i.host }}</a>
