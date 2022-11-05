@@ -10,6 +10,120 @@ import re
 import datetime
 import traceback
 
+logos = {
+    'aardwolf': 'aardwolf.png', 'bonfire': 'bonfire.png', 'bookwyrm': 'bookwyrm.png', 'calckey': 'calckey.png', 'castopod': 'castopod.svg',
+    'diaspora': 'diaspora.svg', 'dokieli': 'dokieli.png', 'drupal': 'drupal.svg', 'epicyon': 'epicyon.png', 'forgefriends': 'forgefriends.svg',
+    'friendica': 'friendica.svg', 'funkwhale': 'funkwhale.svg', 'gancio': 'gancio.png', 'gnusocial': 'gnusocial.svg', 
+    'gotosocial': 'gotosocial.png', 'guppe': 'guppe.png', 'kbin': 'kbin.png', 'ktistec': 'ktistec.png', 'lemmy': 'lemmy.svg', 
+    'mastodon': 'mastodon.svg', 'minipub': 'minipub.svg', 'misskey': 'misskey.png', 'misty': 'misty.png', 'mobilizon': 'mobilizon.svg',
+    'nextcloud': 'nextcloud.png', 'ocelot': 'ocelot.svg', 'osada': 'osada.png', 'owncast': 'owncast.svg', 'peertube': 'peertube.svg', 
+    'pixelfed': 'pixelfed.svg', 'pleroma': 'pleroma.svg', 'plume': 'plume.svg', 'readas': 'readas.svg', 'redmatrix': 'redmatrix.png', 
+    'roadhouse': 'roadhouse.png', 'socialhome': 'socialhome.svg', 'wordpress': 'wordpress.svg', 'writefreely': 'writefreely.svg', 
+    'zap': 'zap.png'}
+
+
+def mk_int(x):
+    if x is None: return None
+    try:
+        return int(x)
+    except:
+        return None
+
+def mk_bool(x):
+    if x is None: return None
+    if isinstance(x, bool): return x
+    if x in ('1', 'true', 'True'): return True
+    if x in ('0', 'false', 'False'): return False
+    return None
+
+class Instance:
+    def __init__(self, host, software, software_version, registrations_open, users, active_month, active_halfyear, local_posts, last_update, uptime, dead, up):
+        host = host.lower()
+        self.host = host
+        if software is None:
+            self.software = None
+        else:
+            self.software = software.lower()
+        self.software_version = software_version
+        self.registrations_open = mk_bool(registrations_open)
+        self.users = mk_int(users)
+        self.active_month = mk_int(active_month)
+        self.active_halfyear = mk_int(active_halfyear)
+        self.local_posts = mk_int(local_posts)
+        self.dead = dead
+        self.up = up
+        self.uptime = None
+        if uptime is not None:
+            try:
+                if uptime == 1.0:
+                    self.uptime = '100 %'
+                elif uptime >= 0.9998:
+                    self.uptime = '%.3f %%' % (float(uptime)*100)
+                elif uptime >= 0.998:
+                    self.uptime = '%.2f %%' % (float(uptime)*100)
+                elif uptime >= 0.98:
+                    self.uptime = '%.1f %%' % (float(uptime)*100)
+                else:
+                    self.uptime = '%.0f %%' % (float(uptime)*100)
+            except:
+                pass
+        self.icon = logos.get(self.software)
+
+        stats = None
+        if self.users is not None:
+            stats = f'users: {self.users}'
+            tmp = list()
+            for x, y in [('active_month', 'last month'), ('active_halfyear', 'last 6 months'), ('uptime', 'uptime')]:
+                z = getattr(self, x)
+                if z is None: continue
+                tmp.append(f'{y}: {z}')
+            if tmp: stats = stats + ' (' + '; '.join(tmp) + ')'
+        self.stats = stats
+            
+        try:
+            self.last_update = datetime.datetime.fromisoformat(last_update)
+            self.last_update_pretty = self.last_update.strftime('%-d %B %Y, %H:%M')
+        except:
+            self.last_update = None
+            
+    def compare_key(self, us):
+        if self.software == 'mastodon':
+            x = ''
+        elif self.software is None:
+            x = '~'
+        else:
+            x = self.software
+        if self.dead == False:
+            dead = 0
+        else:
+            dead = 1
+        return (x, dead, -len(us))
+    
+    def __str__(self):
+        return self.host
+        
+    def __hash__(self):
+        return hash(self.host)
+        
+    def __eq__(self, other):
+        return self.host == other.host
+
+def naked_instance(name):
+    return Instance(name.lower(), None, None, None, None, None, None, None, None, None, None, None)
+
+def get_instance(conn, name):
+    if conn is None: return naked_instance(name)
+    try:
+        cur = conn.cursor()
+        cur.execute('SELECT name, software, software_version, registrations_open, users, active_month, active_halfyear, local_posts, last_update, uptime, dead, up FROM instances WHERE name=? LIMIT 1', (name.lower(),))
+        row = cur.fetchone()
+        if row is None: return naked_instance(name)
+        i = Instance(row[0], row[1], row[2], row[3], row[4], row[5], row[6], row[7], row[8], row[9], row[10], row[11])
+        return i
+    except Exception as e:
+        print(e)
+        return naked_instance(name)
+
 def set_cookie(response, key, value, days_expire=7):
     if days_expire is None:
         max_age = 365 * 24 * 60 * 60  # one year
@@ -165,15 +279,43 @@ def handle_already_authorised(request, access_credentials):
         if results is not None:
             mid_results, extra_results = results.get_results()
             n_users = results.n_users
-                
+
+        mastodon_ids_by_instance = dict()
+        for u in mid_results:
+            for mid in u.mastodon_ids:
+                if mid.host_part in mastodon_ids_by_instance:
+                    mastodon_ids_by_instance[mid.host_part].append((u, mid))
+                else:
+                    mastodon_ids_by_instance[mid.host_part] = [(u, mid)]
+        mastodon_ids_by_instance = {get_instance(instance_db, i): us for i, us in mastodon_ids_by_instance.items()}
+                    
+        service_stats = dict()
+        for inst, us in mastodon_ids_by_instance.items():
+            if inst.software is None:
+                software = 'Unknown'
+            else:
+                software = inst.software.title()
+            if software in service_stats:
+                service_stats[software] += len(us)
+            else:
+                service_stats[software] = len(us)
+        def service_key(x):
+            if x[0] == 'Unknown':
+                return 1
+            else:
+                return -int(x[1])
+        service_stats = sorted(service_stats.items(), key = service_key)
+        
         try:
             if instance_db is not None: instance_db.close()
         except:
             pass
-        
+                    
         context = {
             'action': action,
             'mastodon_id_users': mid_results,
+            'mastodon_ids_by_instance': sorted(mastodon_ids_by_instance.items(), key = lambda x: x[0].compare_key(x[1])),
+            'service_stats': service_stats,
             'requested_user_broken_mastodon_ids': broken_mastodon_ids,
             'requested_user_mastodon_ids': requested_user_mastodon_ids,
             'keyword_users': extra_results,

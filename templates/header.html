@@ -8,6 +8,109 @@
 <title>Debirdify</title>
 <link rel="icon" type="image/svg+xml" href="https://pruvisto.org/debirdify_static/logo.svgz">
 <link rel="stylesheet" href="https://pruvisto.org/debirdify_static/style.css">
+<script src="https://pruvisto.org/debirdify_static/chart.min.js"></script>
+<script>
+function mkChart(id, container_id, title, labels, vals, click_callback) {
+    const div = document.getElementById(container_id)
+
+    const h2 = document.createElement('h2');
+    h2.appendChild(document.createTextNode(title));
+    div.appendChild(h2);
+
+    const canvasDiv = document.createElement('div');
+    canvasDiv.style.width = '100%';
+    canvasDiv.style.maxHeight = '30em';
+    div.appendChild(canvasDiv);
+
+    const canvas = document.createElement('canvas');
+    canvas.style.width = '100%';
+    canvas.style.maxHeight = '30em';
+    canvas.id = 'canvas_chart_' + id;
+    canvasDiv.appendChild(canvas);
+
+    const n = vals.length
+    const colors = Array.from({length: n}, (x, i) => 'hsl(' + (i * 0.123164).toFixed(3) + 'turn 65% 50%)');
+    const hoverColors = Array.from({length: n}, (x, i) => 'hsl(' + (i * 0.123164).toFixed(3) + 'turn 65% 65%)');
+
+    const data = {
+      labels: labels,
+      datasets: [{
+        label: title,
+        data: vals,
+        hoverOffset: 4,
+        backgroundColor: colors,
+        hoverBackgroundColor: hoverColors,
+      }]
+    };
+
+    const myChart = new Chart(canvas.id, {
+      type: "doughnut",
+      data: data,
+      options: {
+          responsive: true,
+          plugins: {
+              legend: {
+                    display: false
+              }
+          },
+          onClick: (a, b) => {
+            if (b.length == 0) return;
+            const x = b[0];
+            if (x == null) return;
+            const i = x.index;
+            if (!Number.isInteger(i) || i < 0 || i >= n) return;
+            if (click_callback != null) click_callback(i);
+          }
+      }
+    });
+
+    const legend = document.createElement('div');
+    legend.style.width='100%';
+    legend.style.justifyContent = 'center';
+    legend.style.display = 'flex';
+    legend.style.flexWrap = 'wrap';
+    legend.style.flexDirection = 'row';
+    legend.style.marginTop = '6pt';
+
+    function triggerHover(idx) {
+      myChart.setActiveElements([{
+        datasetIndex: 0,
+        index: idx,
+      }]);
+      myChart.tooltip.setActiveElements([{
+        datasetIndex: 0,
+        index: idx,
+      }]);
+      myChart.update();
+    }
+
+    for (i = 0; i < n; i++) {
+        const legendDiv = document.createElement('div');
+        legendDiv.style.verticalAlign = 'middle';
+        legendDiv.style.marginTop = '2pt';
+        legendDiv.style.marginBottom = '2pt';
+        legendDiv.style.marginLeft = '6pt';
+        legendDiv.style.marginRight = '6pt';
+        legendDiv.style.cursor = 'pointer';
+        const legendBox = document.createElement('div');
+        legendBox.style.marginRight = '4pt';
+        legendBox.style.float = 'left';
+        legendBox.style.width = '1em';
+        legendBox.style.verticalAlign = 'middle';
+        legendBox.style.height = '1em';
+        legendBox.style.backgroundColor = colors[i];
+        legendDiv.appendChild(legendBox);
+        legendDiv.appendChild(document.createTextNode(labels[i]));
+        const j = i;
+        legendDiv.onclick = function () {click_callback(j)};
+        legendDiv.onmouseover = function() {triggerHover(j);};
+        legend.appendChild(legendDiv);
+    }
+
+    div.appendChild(legend);
+    return myChart;
+}
+</script>
 </head>
 <body>
 <h1><a href="https://pruvisto.org/debirdify_static/logo.svgz"><img src="https://pruvisto.org/debirdify_static/logo.svgz" style="width: 44pt; vertical-align: text-bottom; padding-right: 3pt;"></a>Debirdify</h1>

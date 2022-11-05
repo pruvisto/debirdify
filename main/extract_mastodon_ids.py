@@ -41,7 +41,11 @@ pseudolists = [pl_following, pl_followers, pl_blocked, pl_muted]
 
 _host_heuristic_keywords = ['social', 'masto', 'mastodon']
 
-_forbidden_hosts = {'tiktok.com', 'youtube.com', 'medium.com', 'skeb.jp', 'pronouns.page', 'foundation.app', 'gamejolt.com', 'traewelling.de', 'observablehq.com', 'gmail.com', 'hotmail.com', 'manylink.co', 'withkoji.com', 'twitter.com', 'nomadlist.com'}
+_forbidden_hosts = {
+  'tiktok.com', 'youtube.com', 'medium.com', 'skeb.jp', 'pronouns.page', 'foundation.app', 'gamejolt.com', 'traewelling.de', 'observablehq.com', 
+  'gmail.com', 'hotmail.com', 'manylink.co', 'withkoji.com', 'twitter.com', 'nomadlist.com', 'figma.com', 'peakd.com', 'jabber.ccc.de',
+  'yahoo.com', 'aol.com', 'vice.com', 'wsj.com', 'theguardian.com', 'cbsnews.com', 'cnn.com', 'welt.de', 'nytimes.com', 'gmx.de', 'web.de',
+  'posteo.de', 'arcor.de'}
 
 # Matches anything of the form @foo@bar.bla or foo@bar.social or foo@social.bar or foo@barmastodonbla
 # We do not match everything of the form foo@bar or foo@bar.bla to avoid false positives like email addresses
@@ -73,12 +77,19 @@ class InstanceValidator:
     def validate_host(self, h):
         s = h.lower()
         if is_forbidden_host(s): return False
+        
+        if self.known_host_callback is None:
+            callback_result = None
+        else:
+            callback_result = self.known_host_callback(s)
+
         if self.mode == 'lax':
             return True
         b = matches_host_heuristic(s)
         if b is not None:
             return b
-        if self.known_host_callback is not None and self.known_host_callback(s):
+
+        if callback_result:
             return True
         return False
     
@@ -115,7 +126,7 @@ class MastodonID:
     def query_exists(self):
         url = f'https://{self.host_part}/.well-known/webfinger?resource=acct:{self}'
         try:
-            resp = requests.head(url, timeout=1)
+            resp = requests.head(url, timeout=2, allow_redirects=True)
             if resp.status_code == 404:
                 self.exists = False
             elif resp.status_code == 200:
@@ -176,7 +187,11 @@ def get_lists(client, requested_user):
     page = 1
     while page <= max_lists_pages:
         page += 1
-        resp = client.get_owned_lists(requested_user.id, user_auth=True, user_fields='id', list_fields=['member_count'], pagination_token=next_token)
+        try:
+            resp = client.get_owned_lists(requested_user.id, user_auth=True, user_fields='id', list_fields=['member_count'], pagination_token=next_token)
+        except tweepy.TooManyRequests as e:
+            if page == 1: raise e
+            break
         lists = resp.data or []
         for lst in lists:
             results.append(List(lst.id, lst.name, lst.member_count))
@@ -310,23 +325,27 @@ def extract_mastodon_ids_from_pseudolist(client, requested_user, pl, known_host_
 
     while pages <= pl.page_limit:
         api_call = getattr(client, pl.api_call)
-        if pl.private:
-            resp = api_call(
-                max_results=pl.max_results, 
-                user_auth=True, 
-                user_fields=['name', 'username', 'description', 'entities', 'location', 'pinned_tweet_id'],
-                tweet_fields=['entities'], 
-                expansions='pinned_tweet_id', 
-                pagination_token=next_token)
-        else:
-            resp = api_call(
-                requested_user.id, 
-                max_results=pl.max_results, 
-                user_auth=True, 
-                user_fields=['name', 'username', 'description', 'entities', 'location', 'pinned_tweet_id'],
-                tweet_fields=['entities'], 
-                expansions='pinned_tweet_id', 
-                pagination_token=next_token)
+        try:
+            if pl.private:
+                resp = api_call(
+                    max_results=pl.max_results, 
+                    user_auth=True, 
+                    user_fields=['name', 'username', 'description', 'entities', 'location', 'pinned_tweet_id'],
+                    tweet_fields=['entities'], 
+                    expansions='pinned_tweet_id', 
+                    pagination_token=next_token)
+            else:
+                resp = api_call(
+                    requested_user.id, 
+                    max_results=pl.max_results, 
+                    user_auth=True, 
+                    user_fields=['name', 'username', 'description', 'entities', 'location', 'pinned_tweet_id'],
+                    tweet_fields=['entities'], 
+                    expansions='pinned_tweet_id', 
+                    pagination_token=next_token)
+        except tweepy.TooManyRequests as e:
+            if pages == 1: raise e
+            break
 
         try:
           next_token = resp.meta['next_token']
@@ -352,12 +371,16 @@ def extract_mastodon_ids_from_lists(client, requested_list_ids, known_host_callb
 
     for list_id in requested_list_ids:
         while pages <= max_list_member_pages:
-            resp = client.get_list_members(list_id,
-                    user_auth=True, 
-                    user_fields=['name', 'username', 'description', 'entities', 'location', 'pinned_tweet_id'],
-                    tweet_fields=['entities'], 
-                    expansions='pinned_tweet_id', 
-                    pagination_token=next_token)
+            try:
+                resp = client.get_list_members(list_id,
+                        user_auth=True, 
+                        user_fields=['name', 'username', 'description', 'entities', 'location', 'pinned_tweet_id'],
+                        tweet_fields=['entities'], 
+                        expansions='pinned_tweet_id', 
+                        pagination_token=next_token)
+            except tweepy.TooManyRequests as e:
+                if pages == 1: raise e
+                break
 
             try:
               next_token = resp.meta['next_token']

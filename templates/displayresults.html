@@ -19,7 +19,7 @@
       <p>We found the following Fediverse IDs in {% if is_me %}<a href="https://twitter.com/{{ me.username }}">your</a>{% else %}<a href="https://twitter.com/{{ requested_user.username }}">@{{ requested_user.username }}</a>'s{%endif%} Twitter profile:</p>
       <ul>
       {% for mid in requested_user_mastodon_ids %}
-        <li class="mids"><a href="{{ mid|mid_url }}">{{ mid }}</a> {% if mid.exists %}✔️{% else %}❌<br>This account does not seem to exist.{% endif %}</li>
+        <li class="mids"><a href="{{ mid|mid_url }}">{{ mid }}</a> {% if mid.exists %}✔️{% else %}❌<br>This account does not seem to exist (or the server responds too slowly).{% endif %}</li>
       {% endfor %}
       </ul>
     {% endif %}
@@ -27,7 +27,7 @@
       <p>We found some things in {% if is_me %}<a href="https://twitter.com/{{ me.username }}">your</a>{% else %}<a href="https://twitter.com/{{ requested_user.username }}">@{{ requested_user.username }}</a>'s{%endif%} Twitter profile that might be Fediverse IDs, but we are not sure enough about it to include it in the search results.{% if is_me %}If these are genuine, please consider writing them in the suggested form to ensure tools like Debirdify will pick them up.{% endif %}
       </p>
       <ul>
-      {% for mid in requested_user_broken_mastodon_ids %}<li>{{ mid.original }} {% if mid.exists %}✔️{% else %}❌{% endif %}<br>{% if not mid.exists %}This does not seem to be a Fediverse account.{% else %}Suggested form: <a href="{{ mid.url }}">@{{ mid }}</a>{% endif %}</li>{% endfor %}
+      {% for mid in requested_user_broken_mastodon_ids %}<li>{{ mid.original }} {% if mid.exists %}✔️{% else %}❌{% endif %}<br>{% if not mid.exists %}This does not seem to be a Fediverse account (or the server responds too slowly).{% else %}Suggested form: <a href="{{ mid.url }}">@{{ mid }}</a>{% endif %}</li>{% endfor %}
       </ul>
       <p>Debirdify cannot do an in-depth check like this for every questionable ID on a normal search, so unless it is fairly certain that something is a Fediverse ID, it will be ignored.</p>
     {% endif %}
@@ -55,7 +55,7 @@
 	  {% else %}
 	    {% if action == 'getlist' %}<p>Lists that were searched: {{ requested_lists|join:', ' }}</p>{% endif %}
 	  
-			{% if mastodon_id_users or keyword_users %}Some of the people{% else %}None of the people{% endif %} 
+			{% if mastodon_ids_by_instance or keyword_users %}Some of the people{% else %}None of the people{% endif %} 
 			{% if action == 'getfollowers' %}
 				{% if is_me %}
 					that follow <a href="https://twitter.com/{{ me.username }}">you</a>
@@ -102,26 +102,75 @@
 </form>
 {% endif %}
 
-{% if mastodon_id_users %}
-<p>Out of the {{ n_users_searched }} accounts that we looked at, the following {% if mastodon_id_users|length == 1 %}one has{% else %}{{ mastodon_id_users|length }} have{% endif %} something in their name or bio that looks like a Fediverse ID. (<a href="#export">see below for CSV export</a>)</p>
-<dl class="users">
-  {% for u in mastodon_id_users %}
-    <dt class="users"><a href="https://twitter.com/{{ u.screenname|urlencode }}" class="twitter_acc_link" target="_blank"><span class="displayname">{{ u.name }}</span> <span class="screenname">{{ u.screenname }}</span></a></dt>
-    <dd class="users">
-      <ul class="mids">
-       {% for mid in u.mastodon_ids %}
-         <li class="mids"><a href="{{ mid|mid_url }}">{{ mid }}</a></li>
-       {% endfor %}
-      </ul>
-    </dd>
+{% if mastodon_ids_by_instance %}
+<p>We searched {{ n_users_searched }} Twitter accounts and found {{ mastodon_id_users|length }} Fediverse IDs spread over {{ mastodon_ids_by_instance|length }} instances. (<a href="#export">see below for CSV export</a>)</p>
+
+{% if mastodon_ids_by_instance %}
+<div id="instance_distribution_container"></div>
+<script>
+const instance_dist_labels = [{% for i, us in mastodon_ids_by_instance %}'{{ i.host|addslashes }}',{% endfor %}];
+const instance_dist_vals = [{% for i, us in mastodon_ids_by_instance %}{{ us|length }},{% endfor %}];
+function goto_instance(i) {
+    const dest = document.getElementById('instance_' + (i+1).toString());
+    if (dest == null) return;
+    dest.scrollIntoView();
+}
+mkChart('instance_distribution', 'instance_distribution_container', 'Instance Distribution', instance_dist_labels, instance_dist_vals, goto_instance);
+</script>
+{% endif %}
+
+{% if service_stats %}
+<div id="service_distribution_container"></div>
+<script>
+const service_dist_labels = [{% for serv, n in service_stats %}'{{ serv|addslashes }}',{% endfor %}];
+const service_dist_vals = [{% for serv, n in service_stats %}{{ n }},{% endfor %}];
+mkChart('service_distribution', 'service_distribution_container', 'Service Distribution', service_dist_labels, service_dist_vals, null);
+</script>
+{% endif %}
+
+<ul class="users_by_instance" style="list-style-type: None; padding: 0; margin-right: 0;">
+  {% for i, us in mastodon_ids_by_instance %}
+  {% spaceless %}
+  <li style="border-radius: 1em; padding: 0.8em; padding-bottom: 0; margin-left: 0; margin-bottom: 1em; border: 1px solid #333">
+  <a id="instance_{{ forloop.counter }}"></a>
+  {% if i.icon %}<img src="https://pruvisto.org/debirdify_static/service_icons/{{ i.icon }}" title="{{i.software|title}}" alt="{{i.software|title}}" style="height: 2.5ex; margin-right: 2pt; vertical-align: baseline" class="server_icon">
+  {% else %}
+  <img src="https://pruvisto.org/debirdify_static/service_icons/unknown.svg" title="{{i.software|title}}" alt="{{i.software|title}}" style="height: 2.5ex; margin-right: 2pt" class="server_icon">
+  {% endif %}
+  <span style="font-weight: bold; font-size: 140%;">
+  <a style="margin-right: 2pt; text-decoration: none; color: inherit" href="https://{{ i.host|urlencode }}" target="_blank">{{ i.host }}</a>
+  
+  {% if i.dead %}
+  <img src="https://pruvisto.org/debirdify_static/dead.svg" title="offline or very slow" alt="offline or very slow" class="server_icon" style="height: 1.5ex">
+  {% elif i.registrations_open is not none and not i.registrations_open %}
+  <img src="https://pruvisto.org/debirdify_static/lock.svg" title="not open for registrations" title="not open for registrations" class="server_icon" style="height: 1.5ex">
+  {% elif i.registrations_open %}
+  <img src="https://pruvisto.org/debirdify_static/open.svg" title="open for registrations" title="open for registrations" class="server_icon" style="height: 1.6ex">
+  {% endif %}  
+  </span>
+  
+    {% if i.software is not none %}&nbsp;<span style="color: rgb(83, 100, 113)">{{ i.software|title }} {{ i.software_version }}</span>{% endif %}
+    {% if i.stats is not none %}<br>{{ i.stats }}{% endif %}
+    {% if i.last_update_pretty is not none %}<br>last updated: {{ i.last_update_pretty }}{% endif %}
+  {% endspaceless %}
+    <hr style="border: 1px solid #333">
+    <dl class="users" style="margin-top: 1em; margin-left: 0">
+    {% for u, mid in us %}
+      <dt class="users"><a href="https://twitter.com/{{ u.screenname|urlencode }}" class="twitter_acc_link" target="_blank"><span class="displayname">{{ u.name }}</span> <span class="screenname">{{ u.screenname }}</span></a></dt>
+      <dd class="users" style="margin-left: 0; "><a href="{{ mid|mid_url }}">{{ mid }}</a></dd>
+    {% endfor %}
+  </dl>
+  </li>
   {% endfor %}
-</dl>
+</ul>
 
 <h2>CSV Export</h2>
 <p><a id="export"></a>You can bulk-follow, bulk-block, etc. all the above accounts on Fediverse by downloading the CSV file below and importing it e.g. on Mastodon under Settings → Import and Export → Import. Make sure to select ‘merge’, not ‘overwrite’.</p>
 <p style="margin-bottom: 2em">
 <a class="button" href="data:text/plain;charset=utf-8,{{ csv|urlencode }}" download="following_accounts.csv">Download CSV Export</a>
 </p>
+
+
 {% endif %}
 
 {% if keyword_users %}
