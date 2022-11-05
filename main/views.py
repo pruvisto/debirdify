@@ -9,6 +9,7 @@ from tweepy import TweepyException
 import re
 import datetime
 import traceback
+import math
 
 logos = {
     'aardwolf': 'aardwolf.png', 'bonfire': 'bonfire.png', 'bookwyrm': 'bookwyrm.png', 'calckey': 'calckey.png', 'castopod': 'castopod.svg',
@@ -290,6 +291,12 @@ def handle_already_authorised(request, access_credentials):
                 else:
                     mastodon_ids_by_instance[mid.host_part] = [(u, mid)]
         mastodon_ids_by_instance = {get_instance(instance_db, i): us for i, us in mastodon_ids_by_instance.items()}
+        mastodon_ids_by_instance_list = sorted(mastodon_ids_by_instance.items(), key = lambda x: x[0].compare_key(x[1]))
+        tmp = 0
+        for inst, _ in mastodon_ids_by_instance_list:
+            inst.index = tmp
+            inst.index_plus_one = tmp + 1
+            tmp += 1
                     
         service_stats = dict()
         for inst, us in mastodon_ids_by_instance.items():
@@ -308,6 +315,22 @@ def handle_already_authorised(request, access_credentials):
                 return -int(x[1])
         service_stats = sorted(service_stats.items(), key = service_key)
         
+        most_relevant_instances = list()
+        for inst, us in mastodon_ids_by_instance.items():
+            if inst.users is None or len(us) <= 2: continue
+            inst.score = 1 / (-math.log(len(us) / inst.users) * math.log(inst.users)) * 1000
+            most_relevant_instances.append(inst)
+        most_relevant_instances.sort(key = (lambda inst: inst.score), reverse = True)
+        n_most_relevant = 20
+        most_relevant_instances = most_relevant_instances[:n_most_relevant]
+        if len(most_relevant_instances) <= 1: most_relevant_instances = None
+        if most_relevant_instances:
+            max_score = max([inst.score for inst in most_relevant_instances])
+            for inst in most_relevant_instances:
+                inst.rel_score = inst.score / max_score * 100
+        else:
+            max_score = 0.0
+        
         try:
             if instance_db is not None: instance_db.close()
         except:
@@ -316,8 +339,10 @@ def handle_already_authorised(request, access_credentials):
         context = {
             'action': action,
             'mastodon_id_users': mid_results,
-            'mastodon_ids_by_instance': sorted(mastodon_ids_by_instance.items(), key = lambda x: x[0].compare_key(x[1])),
+            'mastodon_ids_by_instance': mastodon_ids_by_instance_list,
             'service_stats': service_stats,
+            'max_score': max_score,
+            'most_relevant_instances': most_relevant_instances,
             'requested_user_broken_mastodon_ids': broken_mastodon_ids,
             'requested_user_mastodon_ids': requested_user_mastodon_ids,
             'keyword_users': extra_results,

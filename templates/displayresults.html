@@ -105,16 +105,35 @@
 {% if mastodon_ids_by_instance %}
 <p>We searched {{ n_users_searched }} Twitter accounts and found {{ mastodon_id_users|length }} Fediverse IDs spread over {{ mastodon_ids_by_instance|length }} instances. (<a href="#export">see below for CSV export</a>)</p>
 
-{% if mastodon_ids_by_instance %}
-<div id="instance_distribution_container"></div>
 <script>
-const instance_dist_labels = [{% for i, us in mastodon_ids_by_instance %}'{{ i.host|addslashes }}',{% endfor %}];
-const instance_dist_vals = [{% for i, us in mastodon_ids_by_instance %}{{ us|length }},{% endfor %}];
 function goto_instance(i) {
     const dest = document.getElementById('instance_' + (i+1).toString());
     if (dest == null) return;
     dest.scrollIntoView();
 }
+</script>
+
+{% if most_relevant_instances %}
+<h2>Most Relevant Instances</h2>
+<table style="width: 100%; border: none; margin-left: 0.5em">
+{% for inst in most_relevant_instances %}
+<tr class="ranking_row" onclick="goto_instance({{ inst.index }})">
+<td><a href="#instance_{{ inst.index_plus_one }}">{{ inst.host }}</a></td>
+<td style="width: 100%; padding-left: 1em"><div class="ranking_bar" style="width: {{ inst.rel_score|floatformat:0 }}%; height: 1em; background-color: #88f; border-radius: 0.2em;"></div></td>
+<td style="padding-left: 1em; padding-right: 2em; text-align: right">{{ inst.score|floatformat:2 }}</td>
+<tr>
+{% endfor %}
+</table>
+<script>
+Array.from(document.getElementsByClassName('ranking_row')).forEach(elem => elem.style.cursor = 'pointer');
+</script>
+{% endif %}
+
+{% if mastodon_ids_by_instance %}
+<div id="instance_distribution_container"></div>
+<script>
+const instance_dist_labels = [{% for i, us in mastodon_ids_by_instance %}'{{ i.host|addslashes }}',{% endfor %}];
+const instance_dist_vals = [{% for i, us in mastodon_ids_by_instance %}{{ us|length }},{% endfor %}];
 mkChart('instance_distribution', 'instance_distribution_container', 'Instance Distribution', instance_dist_labels, instance_dist_vals, goto_instance);
 </script>
 {% endif %}
@@ -127,6 +146,9 @@ const service_dist_vals = [{% for serv, n in service_stats %}{{ n }},{% endfor %
 mkChart('service_distribution', 'service_distribution_container', 'Service Distribution', service_dist_labels, service_dist_vals, null);
 </script>
 {% endif %}
+
+
+<h2>List of Accounts by Instance</h2>
 
 <ul class="users_by_instance" style="list-style-type: None; padding: 0; margin-right: 0;">
   {% for i, us in mastodon_ids_by_instance %}
