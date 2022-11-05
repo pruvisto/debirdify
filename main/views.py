@@ -163,8 +163,8 @@ def make_csv(users):
 
 def increase_access_counter():
     try:
-        connection.execute("INSERT INTO access_stats (date, count) VALUES (DATE('now'), 1) ON CONFLICT DO UPDATE SET count = count + 1")
-        connection.commit()
+        with connection.cursor() as cur:
+            cur.execute("INSERT INTO access_stats (date, count) VALUES (DATE('now'), 1) ON CONFLICT DO UPDATE SET count = count + 1")
     except Exception as e:
         print('Failed to increase access counter:', e)
 
@@ -199,14 +199,13 @@ def handle_already_authorised(request, access_credentials):
             try:
                 with connection.cursor() as cur:
                     row = cur.execute('SELECT name FROM instances WHERE name=%s LIMIT 1', [s]).fetchone()
-                if row is None:
-                    try:
-                        connection.execute('INSERT INTO unknown_hosts (name) VALUES (%s);', [s])
-                        connection.commit()
-                    except:
-                        pass
-                else:
-                    return True
+                    if row is None:
+                        try:
+                            cur.execute('INSERT INTO unknown_hosts (name) VALUES (%s);', [s])
+                        except:
+                            pass
+                    else:
+                        return True
             except:
                 return False
 
