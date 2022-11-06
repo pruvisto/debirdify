@@ -230,6 +230,7 @@ def handle_already_authorised(request, access_credentials):
 
         lists = None
         results = None
+        followed_lists = None
         mid_results = []
         extra_results = []
         requested_lists = None
@@ -256,10 +257,19 @@ def handle_already_authorised(request, access_credentials):
         elif 'getlists' in request.GET:
             action = 'getlists'
             lists = extract_mastodon_ids.get_lists(client, requested_user)
+            lists_set = set(lists)
+            followed_lists = list()
+            for l in extract_mastodon_ids.get_lists(client, requested_user, mode='following'):
+                if l not in lists_set: followed_lists.append(l)
         elif 'getlist' in request.GET:
             action = 'getlist'
             lists = extract_mastodon_ids.get_lists(client, requested_user)
-            requested_lists = [lst for lst in extract_mastodon_ids.pseudolists + lists if ('list_%s' % lst.id) in request.GET]
+            lists_set = set(lists)
+            followed_lists = list()
+            for l in extract_mastodon_ids.get_lists(client, requested_user, mode='following'):
+                if l not in lists_set: followed_lists.append(l)
+
+            requested_lists = [lst for lst in extract_mastodon_ids.pseudolists + lists + followed_lists if ('list_%s' % lst.id) in request.GET]
             requested_list_ids = [lst.id for lst in requested_lists if not isinstance(lst, extract_mastodon_ids.Pseudolist)]
             
             other_results = dict()
@@ -350,7 +360,8 @@ def handle_already_authorised(request, access_credentials):
             'me' : me,
             'is_me': is_me,
             'csv': make_csv(mid_results),
-            'lists': lists
+            'lists': lists,
+            'followed_lists': followed_lists
         }
         response = render(request, "displayresults.html", context)
         set_cookie(response, settings.TWITTER_CREDENTIALS_COOKIE, access_credentials[0] + ':' + access_credentials[1])

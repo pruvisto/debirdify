@@ -9,10 +9,11 @@ max_lists_pages = 5
 max_list_member_pages = 200
 
 class List:
-    def __init__(self, id, name, member_count):
+    def __init__(self, id, name, member_count, origin='owned'):
         self.id = id
         self.name = name
         self.member_count = member_count
+        self.origin = origin
 
     def __eq__(self, other):
         return self.id == other.id
@@ -181,20 +182,25 @@ def extract_urls_from_tweet(t):
     if t is None or t.entities is None or 'urls' not in t.entities: return []
     return [x['expanded_url'] for x in t.entities['urls'] if 'expanded_url' in x]
 
-def get_lists(client, requested_user):
+def get_lists(client, requested_user, mode = 'normal'):
     next_token = None
     results = list()
     page = 1
+    origin = 'owned'
+    if mode == 'following': origin = 'following'
     while page <= max_lists_pages:
         page += 1
         try:
-            resp = client.get_owned_lists(requested_user.id, user_auth=True, user_fields='id', list_fields=['member_count'], pagination_token=next_token)
+            if mode == 'following':
+                resp = client.get_followed_lists(requested_user.id, user_auth=True, user_fields='id', list_fields=['member_count'], pagination_token=next_token)
+            else:
+                resp = client.get_owned_lists(requested_user.id, user_auth=True, user_fields='id', list_fields=['member_count'], pagination_token=next_token)
         except tweepy.TooManyRequests as e:
             if page == 1: raise e
             break
         lists = resp.data or []
         for lst in lists:
-            results.append(List(lst.id, lst.name, lst.member_count))
+            results.append(List(lst.id, lst.name, lst.member_count, origin = origin))
         try:
           next_token = resp.meta['next_token']
         except:
