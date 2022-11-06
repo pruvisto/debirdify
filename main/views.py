@@ -551,7 +551,7 @@ def try_get_twitter_credentials(request):
 @csrf_protect
 def index(request):
     # clear the credentials cookie if the users requests it
-    if 'clear' in request.POST:
+    if 'clear' in request.GET:
         response = handle_auth_request(request)
         response.delete_cookie(settings.TWITTER_CREDENTIALS_COOKIE)
         return response        
@@ -566,8 +566,8 @@ def index(request):
     
     # if these are set, the user was redirected back to us after a Twitter OAuth authentication
     if 'oauth_token' in request.POST and 'oauth_verifier' in request.POST:
-        request_token = request.POST['oauth_token']
-        request_secret = request.POST['oauth_verifier']
+        request_token = request.GET['oauth_token']
+        request_secret = request.GET'oauth_verifier']
         
         oauth1_user_handler = mk_oauth1()
         oauth1_user_handler.request_token = {
