@@ -95,6 +95,16 @@
 <li><input type="checkbox" id="list_{{ lst.id }}" name="list_{{ lst.id }}"> <label for="list_{{ lst.id }}"><a href="https://twitter.com/i/lists/{{ lst.id|urlencode }}" target="_blank">{{ lst.name }}</a></label> ({{ lst.member_count }} members)</li>
 {% endfor %}
 </ul>
+
+{% if followed_lists %}
+<p>Additionally, {% if is_me %}<a href="https://twitter.com/{{ me.username }}">You</a> follow{% else %}<a href="https://twitter.com/{{ requested_user.username }}">@{{ requested_user.username }}</a> follows{% endif %} the following lists:</p>
+<ul class="lists">
+{% for lst in followed_lists %}
+<li><input type="checkbox" id="list_{{ lst.id }}" name="list_{{ lst.id }}"> <label for="list_{{ lst.id }}"><a href="https://twitter.com/i/lists/{{ lst.id|urlencode }}" target="_blank">{{ lst.name }}</a></label> ({{ lst.member_count }} members)</li>
+{% endfor %}
+</ul>
+{% endif %}
+
 <p><span style="font-weight: bold">Note:</span> For very large lists (several thousand members), not all members might be searched due to rate limiting issues.</p>
 
 <input type="hidden" name="screenname" value="{{requested_name}}">
