@@ -565,7 +565,7 @@ def index(request):
             pass
     
     # if these are set, the user was redirected back to us after a Twitter OAuth authentication
-    if 'oauth_token' in request.POST and 'oauth_verifier' in request.POST:
+    if 'oauth_token' in request.GET and 'oauth_verifier' in request.GET:
         request_token = request.GET['oauth_token']
         request_secret = request.GET['oauth_verifier']
         
