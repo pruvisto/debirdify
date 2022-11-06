@@ -1,4 +1,6 @@
 import re
+from itertools import islice
+from functools import partial
 import tweepy
 import requests
 
@@ -7,6 +9,17 @@ max_lists_pages = 5
 
 # Max pages of list members to query (1 page is roughly 100 members)
 max_list_member_pages = 200
+
+class RequestedUser:
+    def __init__(self, name, src):
+        self.name = name
+        self.src = src
+    
+    def __eq__(self, other):
+        return instanceof(other, RequestedUser) and self.name == other.name and self.src == other.src
+
+    def __str__(self):
+        return f'{self.name} ({self.src})'
 
 class List:
     def __init__(self, id, name, member_count, origin='owned'):
@@ -264,6 +277,7 @@ def extract_mastodon_ids_from_users(client, resp, results, known_host_callback =
     pinned_tweets = {t.id: t for t in pinned_tweets}
     
     for u in users:
+        if u is None: continue
         uid = u.id
         name = u.name
         location = u.location
@@ -324,10 +338,49 @@ def extract_mastodon_ids_from_users(client, resp, results, known_host_callback =
         
         results.add(UserResult(uid, name, screenname, bio, mastodon_ids, extras))
 
+def chunks_of(seq, size):
+    return iter(partial(lambda it: tuple(islice(it, size)), iter(seq)), ())
+
+def extract_mastodon_ids_from_users_raw(client, users, known_host_callback = None):
+    results = Results()
+    errors = list()
+    if not users: return results, errors
+    
+    for us in chunks_of(users, 100):
+        resp = client.get_users(
+                usernames = ','.join([u.name for u in us]), 
+                user_auth=True, 
+                user_fields=['name', 'username', 'description', 'entities', 'location', 'pinned_tweet_id'],
+                tweet_fields=['entities'], 
+                expansions='pinned_tweet_id')
+        if resp.data is None: continue
+        n = len(us)
+        i = 0
+        
+        us_dict = dict()
+        for u in us:
+            try:
+                s = u.name.lower()
+                us_dict[s].append(u)
+            except KeyError:
+                us_dict[s] = [u]
+
+        for u in resp.data:
+            if u is not None:
+                results.n_users += 1
+                try:
+                    del us_dict[u.username.lower()]
+                except KeyError:
+                    pass
+        for errs in us_dict.values():
+            for err in errs:
+                errors.append(err)
+        extract_mastodon_ids_from_users(client, resp, results, known_host_callback=known_host_callback)
+    return results, errors
+
 def extract_mastodon_ids_from_pseudolist(client, requested_user, pl, known_host_callback = None):
     next_token = None
     pages = 1
-    tweet_rate_limit_hit = False
     results = Results()
 
     while pages <= pl.page_limit:
@@ -373,7 +426,6 @@ def extract_mastodon_ids_from_pseudolist(client, requested_user, pl, known_host_
 def extract_mastodon_ids_from_lists(client, requested_list_ids, known_host_callback=None):
     next_token = None
     pages = 1
-    tweet_rate_limit_hit = False
     results = Results()
 
     for list_id in requested_list_ids:

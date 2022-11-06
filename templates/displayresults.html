@@ -3,11 +3,23 @@
 
 <p>Check if the people somebody is following or the members of one of their lists are on Mastodon (or elsewhere in the Fediverse).</p>
 <p>This may take a few seconds if the requested lists contain a lot of people – be patient and do not refresh the page too quickly.</p>
-<form action="./" method="get">
+<form action="./" method="post">
+{% csrf_token %}
 <label for="screenname">Twitter username:</label>&nbsp;
-<input type="text" id="screenname" name="screenname" value="@{% if is_me %}{{ me.username }}{% else %}{{ requested_name }}{% endif %}">
-<br><br>
-<input type="submit" value="Search followed accounts" name="getfollowed">&nbsp;&nbsp;<input type="submit" value="Search followers" name="getfollowers">&nbsp;&nbsp;<input type="submit" value="Search blocked accounts" name="getblocked">&nbsp;&nbsp;<input type="submit" value="Search muted accounts" name="getmuted">&nbsp;&nbsp;<input type="submit" value="Advanced: Retrieve lists" name="getlists">
+<input type="text" id="screenname" name="screenname" value="@{% if is_me or not requested_name %}{{ me.username }}{% else %}{{ requested_name }}{% endif %}">
+<h3>Query Options</h3>
+<input type="submit" value="Search followed accounts" name="getfollowed">&nbsp;&nbsp;<input type="submit" value="Search followers" name="getfollowers">&nbsp;&nbsp;<input type="submit" value="Search blocked accounts" name="getblocked">&nbsp;&nbsp;<input type="submit" value="Search muted accounts" name="getmuted">
+<h3>Advanced</h3>
+<input type="submit" value="Retrieve lists" name="getlists">&nbsp;&nbsp;<a href="#upload" id="upload_custom_link">Upload custom list</a>
+<script>
+  const button = document.createElement('button');
+  const link = document.getElementById('upload_custom_link');
+  button.textContent = link.textContent;
+  button.onclick = function () {document.getElementById('upload_custom_section').scrollIntoView();};
+  button.type = 'button';
+  link.parentNode.append(button);
+  link.remove();
+</script>
 </form>
 
 {% if error_message is not none %}
@@ -45,7 +57,25 @@
 {% if action is not none %}
 <h2>Results</h2>
 
-{% if requested_user is none %}
+{% if uploaded_list_errors %}
+  <div style="border: 1px solid #a33; border-radius: 1em; padding-left: 1em; padding-right: 1em; padding-top: 0.2em; padding-bottom: 0.2em; background-color: #fbb">
+  <p style="font-weight: bold; margin-bottom: 0; margin-top: 0.4em;">File Processing Error</p>
+  <hr style="border: 1px solid #a33">
+  <p>Your uploaded lists contained Twitter handles that are invalid or do not exist.</p>
+  <dl>
+  {% for origin, errs in uploaded_list_errors %}
+    <dt style="margin-top: 0.8em">{% if origin.is_text_area %}Form input{% else %}Uploaded file <tt>{{ origin.name }}</tt>{% endif %}:</dt>
+    <dd>
+    {% for u in errs %}
+      <li>line {{ u.src.line }}: <tt>{{ u.src.original_form }}</tt></li>
+    {% endfor %}
+    </dd>
+  {% endfor %}
+  </dl>
+  </div>
+{% endif %}
+
+{% if action != 'listupload' and requested_user is none %}
 	<p>There is no user called @{{requested_name}}.</p>
 {% else %}
 	{% if action != 'getlists' %}
@@ -69,10 +99,12 @@
 					<a href="https://twitter.com/{{ requested_user.username }}">@{{ requested_user.username }}</a> follows
 				{% endif %}
 			{% elif action == 'getblocked' %}
-         you blocked
+                you blocked
 			{% elif action == 'getmuted' %}
-				 you muted
-			{% else %}
+                you muted
+			{% elif action == 'listupload' %}
+			    in the list you uploaded
+		    {% else %}
 				in the selected lists
 			{% endif %}
 			seem to have a Mastodon account.
@@ -82,34 +114,35 @@
 {% endif %}
 
 {% if action == 'getlists' or action == 'getlist' and not requested_lists %}
-<p>{% if is_me %}<a href="https://twitter.com/{{ me.username }}">You</a> have{% else %}<a href="https://twitter.com/{{ requested_user.username }}">@{{ requested_user.username }}</a> has{% endif %} the following {% if not is_me %}public {% endif %}list{% if list|length != 1%}s{% endif %}. Select the ones you want to search by clicking the checkboxes next to them.</p>
-<form action="./" method="get">
-<ul class="lists">
-<li><input type="checkbox" id="list_following" name="list_following"> <label for="list_following"><a href="https://twitter.com/{{ requested_user.username }}/following" target="_blank">Followed accounts</a></label> ({{ requested_user.public_metrics.following_count }} members)</li>
-<li><input type="checkbox" id="list_followers" name="list_followers"> <label for="list_followers"><a href="https://twitter.com/{{ requested_user.username }}/followers" target="_blank">Followers</a></label> ({{ requested_user.public_metrics.followers_count }} members)</li>
-{% if is_me %}
-<li><input type="checkbox" id="list_blocked" name="list_blocked"> <label for="list_blocked"><a href="https://twitter.com/settings/blocked/all" target="_blank">Blocked accounts</a></label></li>
-<li><input type="checkbox" id="list_muted" name="list_muted"> <label for="list_muted"><a href="https://twitter.com/settings/muted/all" target="_blank">Muted accounts</a></label></li>
-{% endif %}
-{% for lst in lists %}
-<li><input type="checkbox" id="list_{{ lst.id }}" name="list_{{ lst.id }}"> <label for="list_{{ lst.id }}"><a href="https://twitter.com/i/lists/{{ lst.id|urlencode }}" target="_blank">{{ lst.name }}</a></label> ({{ lst.member_count }} members)</li>
-{% endfor %}
-</ul>
+  <p>{% if is_me %}<a href="https://twitter.com/{{ me.username }}">You</a> have{% else %}<a href="https://twitter.com/{{ requested_user.username }}">@{{ requested_user.username }}</a> has{% endif %} the following {% if not is_me %}public {% endif %}list{% if list|length != 1%}s{% endif %}. Select the ones you want to search by clicking the checkboxes next to them.</p>
+  <form action="./" method="post">
+  {% csrf_token %}
+  <ul class="lists">
+  <li><input type="checkbox" id="list_following" name="list_following"> <label for="list_following"><a href="https://twitter.com/{{ requested_user.username }}/following" target="_blank">Followed accounts</a></label> ({{ requested_user.public_metrics.following_count }} members)</li>
+  <li><input type="checkbox" id="list_followers" name="list_followers"> <label for="list_followers"><a href="https://twitter.com/{{ requested_user.username }}/followers" target="_blank">Followers</a></label> ({{ requested_user.public_metrics.followers_count }} members)</li>
+  {% if is_me %}
+    <li><input type="checkbox" id="list_blocked" name="list_blocked"> <label for="list_blocked"><a href="https://twitter.com/settings/blocked/all" target="_blank">Blocked accounts</a></label></li>
+    <li><input type="checkbox" id="list_muted" name="list_muted"> <label for="list_muted"><a href="https://twitter.com/settings/muted/all" target="_blank">Muted accounts</a></label></li>
+  {% endif %}
+  {% for lst in lists %}
+    <li><input type="checkbox" id="list_{{ lst.id }}" name="list_{{ lst.id }}"> <label for="list_{{ lst.id }}"><a href="https://twitter.com/i/lists/{{ lst.id|urlencode }}" target="_blank">{{ lst.name }}</a></label> ({{ lst.member_count }} members)</li>
+  {% endfor %}
+  </ul>
 
-{% if followed_lists %}
-<p>Additionally, {% if is_me %}<a href="https://twitter.com/{{ me.username }}">You</a> follow{% else %}<a href="https://twitter.com/{{ requested_user.username }}">@{{ requested_user.username }}</a> follows{% endif %} the following lists:</p>
-<ul class="lists">
-{% for lst in followed_lists %}
-<li><input type="checkbox" id="list_{{ lst.id }}" name="list_{{ lst.id }}"> <label for="list_{{ lst.id }}"><a href="https://twitter.com/i/lists/{{ lst.id|urlencode }}" target="_blank">{{ lst.name }}</a></label> ({{ lst.member_count }} members)</li>
-{% endfor %}
-</ul>
-{% endif %}
+  {% if followed_lists %}
+    <p>Additionally, {% if is_me %}<a href="https://twitter.com/{{ me.username }}">You</a> follow{% else %}<a href="https://twitter.com/{{ requested_user.username }}">@{{ requested_user.username }}</a> follows{% endif %} the following lists:</p>
+    <ul class="lists">
+    {% for lst in followed_lists %}
+      <li><input type="checkbox" id="list_{{ lst.id }}" name="list_{{ lst.id }}"> <label for="list_{{ lst.id }}"><a href="https://twitter.com/i/lists/{{ lst.id|urlencode }}" target="_blank">{{ lst.name }}</a></label> ({{ lst.member_count }} members)</li>
+    {% endfor %}
+    </ul>
+  {% endif %}
 
-<p><span style="font-weight: bold">Note:</span> For very large lists (several thousand members), not all members might be searched due to rate limiting issues.</p>
+  <p><span style="font-weight: bold">Note:</span> For very large lists (several thousand members), not all members might be searched due to rate limiting issues.</p>
 
-<input type="hidden" name="screenname" value="{{requested_name}}">
-<input type="submit" name="getlist" value="Search lists">
-</form>
+  <input type="hidden" name="screenname" value="{{requested_name}}">
+  <input type="submit" name="getlist" value="Search lists">
+  </form>
 {% endif %}
 
 {% if mastodon_ids_by_instance %}
@@ -124,22 +157,22 @@ function goto_instance(i) {
 </script>
 
 {% if most_relevant_instances %}
-<h2>Most Relevant Instances</h2>
-<p>
-The following ranking shows the instances that Debirdify considers most relevant to {% if is_me %}you{% else %}@{{requested_name}}{% endif %} based on the Fediverse accounts we found according to your query.
-</p>
-<table style="width: 100%; border: none; margin-left: 0.5em">
-{% for inst in most_relevant_instances %}
-<tr class="ranking_row" onclick="goto_instance({{ inst.index }})">
-<td><a href="#instance_{{ inst.index_plus_one }}">{{ inst.host }}</a></td>
-<td style="width: 100%; padding-left: 1em"><div class="ranking_bar" style="width: {{ inst.rel_score|floatformat:0 }}%; height: 1em; background-color: #88f; border-radius: 0.2em;"></div></td>
-<td style="padding-left: 1em; padding-right: 2em; text-align: right">{{ inst.score|floatformat:2 }}</td>
-</tr>
-{% endfor %}
-</table>
-<script>
-Array.from(document.getElementsByClassName('ranking_row')).forEach(elem => elem.style.cursor = 'pointer');
-</script>
+  <h2>Most Relevant Instances</h2>
+  <p>
+  The following ranking shows the instances that Debirdify considers most relevant to {% if is_me %}you{% else %}@{{requested_name}}{% endif %} based on the Fediverse accounts we found according to your query.
+  </p>
+  <table style="width: 100%; border: none; margin-left: 0.5em">
+  {% for inst in most_relevant_instances %}
+    <tr class="ranking_row" onclick="goto_instance({{ inst.index }})">
+    <td><a href="#instance_{{ inst.index_plus_one }}">{{ inst.host }}</a></td>
+    <td style="width: 100%; padding-left: 1em"><div class="ranking_bar" style="width: {{ inst.rel_score|floatformat:0 }}%; height: 1em; background-color: #88f; border-radius: 0.2em;"></div></td>
+    <td style="padding-left: 1em; padding-right: 2em; text-align: right">{{ inst.score|floatformat:2 }}</td>
+    </tr>
+  {% endfor %}
+  </table>
+  <script>
+  Array.from(document.getElementsByClassName('ranking_row')).forEach(elem => elem.style.cursor = 'pointer');
+  </script>
 {% endif %}
 
 {% if mastodon_ids_by_instance %}
@@ -252,6 +285,16 @@ mkChart('service_distribution', 'service_distribution_container', 'Service Distr
 <p style="margin-bottom: 2em; margin-top: 2em;">
 <a class="button" href="./?clear=clear">Log Out</a>
 </p>
+
+
+<h2 id="upload_custom_section">Upload Custom List</h2>
+<p>Instead of scanning a list from Twitter (followers, blocked accounts, etc.) you can also directly enter or upload a list of accounts to scan. The expected format is one Twitter user name per line, with or without a leading <tt>@</tt>. If a line contains invalid characters (not <tt>A-Za-z_@</tt>), only the string up to the first invalid character is used.</p>
+<form action="./" enctype="multipart/form-data" method="post">
+{% csrf_token %}
+<textarea id="list_entry" name="list_entry" style="width: 100%; height: 10em; resize: vertical" placeholder="#Enter your queries here or upload some lists below&#10;@pruvisto&#10;debirdify">{{ list_entry }}</textarea><br />
+<p><input type="file" id="uploaded_list" name="uploaded_list" multiple></p>
+<p><input type="submit" name="listupload" value="Submit" style=""></p>
+</form>
 
 {% include "footer.html" %}
 </html>

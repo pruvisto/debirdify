@@ -2,6 +2,7 @@ from django.shortcuts import render
 from django.http import HttpResponse
 from django.conf import settings
 from django.views.decorators.gzip import gzip_page
+from django.views.decorators.csrf import csrf_protect
 from django.db import connection
 import tweepy
 import sqlite3
@@ -11,6 +12,9 @@ import re
 import datetime
 import traceback
 import math
+import codecs
+from io import TextIOWrapper
+from functools import total_ordering
 
 logos = {
     'aardwolf': 'aardwolf.png', 'bonfire': 'bonfire.png', 'bookwyrm': 'bookwyrm.png', 'calckey': 'calckey.png', 'castopod': 'castopod.svg',
@@ -23,6 +27,14 @@ logos = {
     'roadhouse': 'roadhouse.png', 'socialhome': 'socialhome.svg', 'wordpress': 'wordpress.svg', 'writefreely': 'writefreely.svg', 
     'zap': 'zap.png'}
 
+class RequestedUserSrc:
+    def __init__(self, original_form, origin, line):
+        self.original_form = original_form
+        self.origin = origin
+        self.line = line
+        
+    def __str__(self):
+        return f'{self.origin}, line {self.line}'
 
 def mk_int(x):
     if x is None: return None
@@ -37,6 +49,37 @@ def mk_bool(x):
     if x in ('1', 'true', 'True'): return True
     if x in ('0', 'false', 'False'): return False
     return None
+
+def is_twitter_handle(s):
+    for c in str(s):
+        if not c.isalnum() and c != '_':
+            return False
+    return True
+
+_twitter_handle_pattern = re.compile('\s*@?([A-Za-z_]+)')
+    
+def parse_twitter_handle(x):
+    match = _twitter_handle_pattern.match(x)
+    if match is None:
+        return None
+    else:
+        return match[1]
+
+def parse_twitter_handles(origin, handles):
+    line = 0
+    errors = list()
+    results = list()
+    for s in handles:
+        line += 1
+        if not s.strip(): continue
+        src = RequestedUserSrc(s, origin, line)
+        x = parse_twitter_handle(s)
+        if x is None:
+            errors.append(extract_mastodon_ids.RequestedUser(s, src))
+        else:
+            results.append(extract_mastodon_ids.RequestedUser(x, src))
+    return results, errors
+    
 
 class Instance:
     def __init__(self, host, software, software_version, registrations_open, users, active_month, active_halfyear, local_posts, last_update, uptime, dead, up):
@@ -169,6 +212,70 @@ def increase_access_counter():
 #    except Exception as e:
 #        print('Failed to increase access counter:', e)
 
+class FileUploadError(Exception):
+    pass
+
+class UploadedFileOrigin:
+    def __init__(self, name):
+        self.name = name
+        self.is_text_area = False
+    
+    def __str__(self):
+        return self.name
+    
+    def __eq__(self, other):
+        return isinstance(other, UploadedFileOrigin) and self.name == other.name
+        
+    def __hash__(self):
+        return hash(self.name)
+        
+    def __lt__(self, other):
+        return isinstance(other, UploadedFileOrigin) and self.name < other.name
+        
+class TextAreaOrigin:
+    def __init__(self):
+        self.is_text_area = True
+
+    def __eq__(self, other):
+        return isinstance(other, TextAreaOrigin)
+    
+    def __str__(self):
+        return '<text area>'
+    
+    def __hash__(self):
+        return hash("TextAreaOrigin")
+        
+    def __lt__(self, other):
+        return isinstance(other, UploadedFileOrigin)
+        
+def group(xs, key):
+    d = dict()
+    for x in xs:
+        k = key(x)
+        try:
+            d[k].append(x)
+        except KeyError:
+            d[k] = [x]
+    return d
+
+def read_uploaded_lists(request):
+    us = list()
+    errors = list()
+    for f in request.FILES.getlist('uploaded_list'):
+        file_src = UploadedFileOrigin(f.name)
+        line_no = 0
+        for l in TextIOWrapper(f, encoding="utf-8"):
+            line_no += 1
+            l = l.strip()
+            if not l: continue
+            x = parse_twitter_handle(l)
+            src = RequestedUserSrc(l, file_src, line_no)
+            if x is None:
+                errors.append(extract_mastodon_ids.RequestedUser(l, src))
+            else:
+                us.append(extract_mastodon_ids.RequestedUser(x, src))
+    return us, errors
+
 def handle_already_authorised(request, access_credentials):
     screenname = ''
     try:
@@ -183,8 +290,8 @@ def handle_already_authorised(request, access_credentials):
                 tweet_fields=['entities'], expansions='pinned_tweet_id')
         me = me_resp.data
 
-        if 'screenname' in request.GET:
-            screenname = request.GET['screenname']
+        if 'screenname' in request.POST:
+            screenname = request.POST['screenname']
             if screenname[:1] == '@': screenname = screenname[1:]
             requested_user_resp = client.get_user(username=screenname, user_auth=True, user_fields=['name', 'username', 'description', 'entities', 'location', 'pinned_tweet_id', 'public_metrics'],
                 tweet_fields=['entities'], expansions='pinned_tweet_id')
@@ -237,31 +344,48 @@ def handle_already_authorised(request, access_credentials):
         action = None
         n_users = None
         action_taken = True
+        uploaded_list_errors = {}
 
-        if 'getfollowed' in request.GET:
+        if 'getfollowed' in request.POST:
             action = 'getfollowed'
             results = extract_mastodon_ids.extract_mastodon_ids_from_pseudolist(
                 client, requested_user, extract_mastodon_ids.pl_following, known_host_callback = known_host_callback)
-        elif 'getfollowers' in request.GET:
+        elif 'getfollowers' in request.POST:
             action = 'getfollowers'
             results = extract_mastodon_ids.extract_mastodon_ids_from_pseudolist(
                 client, requested_user, extract_mastodon_ids.pl_followers, known_host_callback = known_host_callback)
-        elif 'getblocked' in request.GET:
+        elif 'getblocked' in request.POST:
             action = 'getblocked'
             results = extract_mastodon_ids.extract_mastodon_ids_from_pseudolist(
                 client, requested_user, extract_mastodon_ids.pl_blocked, known_host_callback = known_host_callback)
-        elif 'getmuted' in request.GET:
+        elif 'getmuted' in request.POST:
             action = 'getmuted'
             results = extract_mastodon_ids.extract_mastodon_ids_from_pseudolist(
                 client, requested_user, extract_mastodon_ids.pl_muted, known_host_callback = known_host_callback)
-        elif 'getlists' in request.GET:
+        elif 'getlists' in request.POST:
             action = 'getlists'
             lists = extract_mastodon_ids.get_lists(client, requested_user)
             lists_set = set(lists)
             followed_lists = list()
             for l in extract_mastodon_ids.get_lists(client, requested_user, mode='following'):
                 if l not in lists_set: followed_lists.append(l)
-        elif 'getlist' in request.GET:
+        elif 'listupload' in request.POST:
+            action = 'listupload'
+            uploaded_list, uploaded_list_errors = read_uploaded_lists(request)
+
+            list_entry = request.POST.get('list_entry')
+            if list_entry is None: list_entry = ''
+            list_entry, list_entry_errors = parse_twitter_handles(TextAreaOrigin(), list_entry.splitlines())
+            
+            uploaded_users = uploaded_list + list_entry
+            
+            results, errors = extract_mastodon_ids.extract_mastodon_ids_from_users_raw(client, uploaded_users, known_host_callback = known_host_callback)
+
+            uploaded_list_errors = uploaded_list_errors + list_entry_errors + errors
+            uploaded_list_errors.sort(key = (lambda u: u.src.line))
+            uploaded_list_errors = group(uploaded_list_errors, key = (lambda x: x.src.origin))
+
+        elif 'getlist' in request.POST:
             action = 'getlist'
             lists = extract_mastodon_ids.get_lists(client, requested_user)
             lists_set = set(lists)
@@ -269,12 +393,12 @@ def handle_already_authorised(request, access_credentials):
             for l in extract_mastodon_ids.get_lists(client, requested_user, mode='following'):
                 if l not in lists_set: followed_lists.append(l)
 
-            requested_lists = [lst for lst in extract_mastodon_ids.pseudolists + lists + followed_lists if ('list_%s' % lst.id) in request.GET]
+            requested_lists = [lst for lst in extract_mastodon_ids.pseudolists + lists + followed_lists if ('list_%s' % lst.id) in request.POST]
             requested_list_ids = [lst.id for lst in requested_lists if not isinstance(lst, extract_mastodon_ids.Pseudolist)]
             
             other_results = dict()
             for pl in extract_mastodon_ids.pseudolists:
-                if f'list_{pl.id}' in request.GET:
+                if f'list_{pl.id}' in request.POST:
                     other_results[pl] = extract_mastodon_ids.extract_mastodon_ids_from_pseudolist(
                         client, requested_user, pl, known_host_callback = known_host_callback)
                 
@@ -341,7 +465,7 @@ def handle_already_authorised(request, access_credentials):
                 inst.rel_score = inst.score / max_score * 100
         else:
             max_score = 0.0
-        
+
         context = {
             'action': action,
             'mastodon_id_users': mid_results,
@@ -357,6 +481,8 @@ def handle_already_authorised(request, access_credentials):
             'requested_name': screenname, 
             'requested_lists': requested_lists,
             'n_users_searched': n_users,
+            'uploaded_list_errors': sorted(uploaded_list_errors.items(), key = lambda x: x[0]),
+            'list_entry': request.POST.get('list_entry') or "",
             'me' : me,
             'is_me': is_me,
             'csv': make_csv(mid_results),
@@ -376,14 +502,15 @@ def handle_already_authorised(request, access_credentials):
           'n_users_searched': 0,
           'requested_user': None,
           'me': None,
-          'is_me': 'screenname' not in request.GET,
+          'is_me': 'screenname' not in request.POST,
           'csv': None
         }
         response = render(request, "displayresults.html", context)
         return response
     except (tweepy.BadRequest, tweepy.NotFound) as e:
-        if 'screenname' in request.GET:
-            screenname = request.GET['screenname']
+        print(e)
+        if 'screenname' in request.POST:
+            screenname = request.POST['screenname']
             if screenname[:1] == '@': screenname = screenname[1:]
         else:
             screenname = ''
@@ -396,7 +523,7 @@ def handle_already_authorised(request, access_credentials):
           'n_users_searched': 0,
           'requested_user': None,
           'me': None,
-          'is_me': 'screenname' not in request.GET,
+          'is_me': 'screenname' not in request.POST,
           'csv': None
         }
         response = render(request, "displayresults.html", context)
@@ -421,9 +548,10 @@ def try_get_twitter_credentials(request):
     return xs[0].strip(), xs[1].strip()
 
 @gzip_page
+@csrf_protect
 def index(request):
     # clear the credentials cookie if the users requests it
-    if 'clear' in request.GET:
+    if 'clear' in request.POST:
         response = handle_auth_request(request)
         response.delete_cookie(settings.TWITTER_CREDENTIALS_COOKIE)
         return response        
@@ -437,9 +565,9 @@ def index(request):
             pass
     
     # if these are set, the user was redirected back to us after a Twitter OAuth authentication
-    if 'oauth_token' in request.GET and 'oauth_verifier' in request.GET:
-        request_token = request.GET['oauth_token']
-        request_secret = request.GET['oauth_verifier']
+    if 'oauth_token' in request.POST and 'oauth_verifier' in request.POST:
+        request_token = request.POST['oauth_token']
+        request_secret = request.POST['oauth_verifier']
         
         oauth1_user_handler = mk_oauth1()
         oauth1_user_handler.request_token = {
