@@ -56,7 +56,7 @@ def is_twitter_handle(s):
             return False
     return True
 
-_twitter_handle_pattern = re.compile('\s*@?([A-Za-z_]+)')
+_twitter_handle_pattern = re.compile('\s*@?([A-Za-z0-9_]{3,15})')
     
 def parse_twitter_handle(x):
     match = _twitter_handle_pattern.match(x)
