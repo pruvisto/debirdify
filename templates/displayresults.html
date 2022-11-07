@@ -288,7 +288,7 @@ mkChart('service_distribution', 'service_distribution_container', 'Service Distr
 
 
 <h2 id="upload_custom_section">Upload Custom List</h2>
-<p>Instead of scanning a list from Twitter (followers, blocked accounts, etc.) you can also directly enter or upload a list of accounts to scan. The expected format is one Twitter user name per line, with or without a leading <tt>@</tt>. If a line contains invalid characters (not <tt>A-Za-z0-9_@</tt>), only the string up to the first invalid character is used.</p>
+<p>Instead of scanning a list from Twitter (followers, blocked accounts, etc.) you can also directly enter or upload a list of accounts to scan. The expected format is one Twitter user name per line, with or without a leading <tt>@</tt>. Note that usernames must contain only valid characters (<tt>A-Za-z0-9_</tt>) and have a length of 3–15 characters.</p>
 <form action="./" enctype="multipart/form-data" method="post">
 {% csrf_token %}
 <textarea id="list_entry" name="list_entry" style="width: 100%; height: 10em; resize: vertical" placeholder="#Enter your queries here or upload some lists below&#10;@pruvisto&#10;debirdify">{{ list_entry }}</textarea><br />
