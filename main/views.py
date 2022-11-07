@@ -300,7 +300,8 @@ def handle_already_authorised(request, access_credentials):
         def known_host_callback(s):
             try:
                 with connection.cursor() as cur:
-                    row = cur.execute('SELECT name FROM instances WHERE name=%s LIMIT 1', [s]).fetchone()
+                    cur.execute('SELECT name FROM instances WHERE name=%s LIMIT 1', [s])
+                    row = cur.fetchone()
                     if row is None:
                         try:
                             cur.execute('INSERT INTO unknown_hosts (name) VALUES (%s);', [s])
@@ -308,7 +309,7 @@ def handle_already_authorised(request, access_credentials):
                             pass
                     else:
                         return True
-            except:
+            except Exception as e:
                 return False
 
         broken_mastodon_ids = []
