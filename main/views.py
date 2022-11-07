@@ -50,12 +50,6 @@ def mk_bool(x):
     if x in ('0', 'false', 'False'): return False
     return None
 
-def is_twitter_handle(s):
-    for c in str(s):
-        if not c.isalnum() and c != '_':
-            return False
-    return True
-
 _twitter_handle_pattern = re.compile('\s*@?([A-Za-z0-9_]{3,15})')
     
 def parse_twitter_handle(x):
