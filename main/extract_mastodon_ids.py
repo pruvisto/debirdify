@@ -287,10 +287,15 @@ def extract_mastodon_ids_from_users(client, resp, results, known_host_callback =
         bio = u.description
         if u.pinned_tweet_id is not None:
             pinned_tweet = pinned_tweets.get(u.pinned_tweet_id)
-            pinned_tweet_text = pinned_tweet.text
+            if pinned_tweet is None:
+                pinned_tweet_text = ""
+                print(screenname)
+                print(u.pinned_tweet_id)
+            else:
+                pinned_tweet_text = pinned_tweet.text
         else:
             pinned_tweet = None
-            pinnet_tweet_text = ""
+            pinned_tweet_text = ""
             
         extras = None
         # Parse Mastodon IDs of the form @foo@bar.tld or foo@bar.tld
