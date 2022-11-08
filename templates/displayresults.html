@@ -254,7 +254,21 @@ mkChart('service_distribution', 'service_distribution_container', 'Service Distr
 <h2>CSV Export</h2>
 <p><a id="export"></a>You can bulk-follow, bulk-block, etc. all the above accounts on Fediverse by downloading the CSV file below and importing it e.g. on Mastodon under Settings → Import and Export → Import. Make sure to select ‘merge’, not ‘overwrite’.</p>
 <p style="margin-bottom: 2em">
-<a class="button" href="data:text/plain;charset=utf-8,{{ csv|urlencode }}" download="following_accounts.csv">Download CSV Export</a>
+<a class="button" href="data:text/plain;charset=utf-8,{{ csv|urlencode }}"
+  {% if action == 'getfollowed' %}
+     download="following_accounts.csv"
+  {% elif action == 'getfollowers' %}
+     download="followers_accounts.csv"
+  {% elif action == 'getblocked' %}
+     download="blocked_accounts.csv"
+  {% elif action == 'getmuted' %}
+     download="muted_accounts.csv"
+  {% elif action == 'getlists' %}
+     download="list_accounts.csv"
+  {% else %}
+     download="accounts.csv"
+  {% endif %}  
+>Download CSV Export</a>
 </p>
 
 
