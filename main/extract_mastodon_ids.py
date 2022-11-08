@@ -287,8 +287,10 @@ def extract_mastodon_ids_from_users(client, resp, results, known_host_callback =
         bio = u.description
         if u.pinned_tweet_id is not None:
             pinned_tweet = pinned_tweets.get(u.pinned_tweet_id)
+            pinned_tweet_text = pinned_tweet.text
         else:
             pinned_tweet = None
+            pinnet_tweet_text = ""
             
         extras = None
         # Parse Mastodon IDs of the form @foo@bar.tld or foo@bar.tld
@@ -296,7 +298,7 @@ def extract_mastodon_ids_from_users(client, resp, results, known_host_callback =
         # must pass heuristic or be a known host)
         mastodon_ids = set()
         
-        for text in [name, location, bio]:
+        for text in [name, location, bio, pinned_tweet_text]:
             if text is None: continue
             for prefix, s in _id_pattern1.findall(text):
                 certain = False
