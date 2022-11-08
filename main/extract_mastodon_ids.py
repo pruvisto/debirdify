@@ -289,8 +289,6 @@ def extract_mastodon_ids_from_users(client, resp, results, known_host_callback =
             pinned_tweet = pinned_tweets.get(u.pinned_tweet_id)
             if pinned_tweet is None:
                 pinned_tweet_text = ""
-                print(screenname)
-                print(u.pinned_tweet_id)
             else:
                 pinned_tweet_text = pinned_tweet.text
         else:
