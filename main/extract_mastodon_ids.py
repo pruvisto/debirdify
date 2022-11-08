@@ -143,12 +143,14 @@ class MastodonID:
             resp = requests.head(url, timeout=2, allow_redirects=True)
             if resp.status_code == 404:
                 self.exists = False
+            elif resp.status_code == 403:
+                self.exists = 'forbidden'
             elif resp.status_code == 200:
                 self.exists = True
             else:
                 self.exists = None
         except:
-            self.exists = None
+            self.exists = 'error'
         return self.exists
         
 

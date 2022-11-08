@@ -31,7 +31,14 @@
       <p>We found the following Fediverse IDs in {% if is_me %}<a href="https://twitter.com/{{ me.username }}">your</a>{% else %}<a href="https://twitter.com/{{ requested_user.username }}">@{{ requested_user.username }}</a>'s{%endif%} Twitter profile:</p>
       <ul>
       {% for mid in requested_user_mastodon_ids %}
-        <li class="mids"><a href="{{ mid|mid_url }}">{{ mid }}</a> {% if mid.exists %}✔️{% else %}❌<br>This account does not seem to exist (or the server responds too slowly).{% endif %}</li>
+        {% spaceless %}
+        <li class="mids"><a href="{{ mid|mid_url }}">{{ mid }}</a>&nbsp;
+        {% if mid.exists == 'forbidden' %}❓<br>This server blocks our request. Consider contacting the server admins about it.
+        {% elif mid.exists == True %}✔️
+        {% elif mid.exists == False %}❌<br>This account does not exist. Do you perhaps have a typo?
+        {% elif mid.exists == 'error' %}❌<br>This server does not exist or responds too slowly.
+        {% else %}❌<br>The server responded in a way we cannot interpret.{% endif %}</li>
+        {% endspaceless %}
       {% endfor %}
       </ul>
     {% endif %}
