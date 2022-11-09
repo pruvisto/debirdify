@@ -46,8 +46,8 @@ def mk_int(x):
 def mk_bool(x):
     if x is None: return None
     if isinstance(x, bool): return x
-    if x in ('1', 'true', 'True'): return True
-    if x in ('0', 'false', 'False'): return False
+    if x in (1, True, '1', 'true', 'True'): return True
+    if x in (0, False, '0', 'false', 'False'): return False
     return None
 
 _twitter_handle_pattern = re.compile('^\s*@?([A-Za-z0-9_]{3,15})\s*$')
@@ -85,6 +85,7 @@ class Instance:
             self.software = software.lower()
         self.software_version = software_version
         self.registrations_open = mk_bool(registrations_open)
+        print(self.registrations_open, registrations_open)
         self.users = mk_int(users)
         self.active_month = mk_int(active_month)
         self.active_halfyear = mk_int(active_halfyear)
