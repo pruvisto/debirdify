@@ -191,20 +191,17 @@ const instance_scores = [{% for i, us in mastodon_ids_by_instance %}{% if i.scor
 const instance_users = [{% for i, us in mastodon_ids_by_instance %}{% if i.users is not null %}{{i.users}}{% else %}null{% endif %},{% endfor %}]
 function mk_label(i) {
     var label = instance_dist_labels[i];
-    var has_extras = false;
-    var extras = "";
+    var lines = [label];
+    if (instance_dist_vals[i] != null) {
+        lines.push('Accounts in search results: ' + instance_dist_vals[i]);
+    }
     if (instance_users[i] != null) {
-        extras += instance_users[i] + ' users';
-        has_extras = true;
+        lines.push('Total users: ' + instance_users[i]);
     }
     if (instance_scores[i] != null) {
-        if (has_extras) extras += ', ';
-        extras += 'relevance score: ' + instance_scores[i].toFixed(2);
-        has_extras = true;
+        lines.push('Relevance score: ' + instance_scores[i].toFixed(2));
     }
-    if (has_extras)
-        label = label + ' (' + extras + ')';
-    return label;
+    return lines;
 }
 mkChart('instance_distribution', 'instance_distribution_container', 'Instance Distribution', instance_dist_labels, instance_dist_vals, goto_instance, mk_label);
 </script>
@@ -215,7 +212,12 @@ mkChart('instance_distribution', 'instance_distribution_container', 'Instance Di
 <script>
 const service_dist_labels = [{% for serv, n in service_stats %}'{{ serv|addslashes }}',{% endfor %}];
 const service_dist_vals = [{% for serv, n in service_stats %}{{ n }},{% endfor %}];
-mkChart('service_distribution', 'service_distribution_container', 'Service Distribution', service_dist_labels, service_dist_vals, null, null);
+function mk_label(i) {
+    const label = service_dist_labels[i];
+    const label2 = 'Accounts in search results: ' + service_dist_vals[i];
+    return [label, label2];
+}
+mkChart('service_distribution', 'service_distribution_container', 'Service Distribution', service_dist_labels, service_dist_vals, null, mk_label);
 </script>
 {% endif %}
 
