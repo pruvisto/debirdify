@@ -270,6 +270,9 @@ def read_uploaded_lists(request):
             else:
                 us.append(extract_mastodon_ids.RequestedUser(x, src))
     return us, errors
+    
+class NoSuchUser(Exception):
+    pass
 
 def handle_already_authorised(request, access_credentials):
     screenname = ''
@@ -291,7 +294,10 @@ def handle_already_authorised(request, access_credentials):
             requested_user_resp = client.get_user(username=screenname, user_auth=True, user_fields=['name', 'username', 'description', 'entities', 'location', 'pinned_tweet_id', 'public_metrics'],
                 tweet_fields=['entities'], expansions='pinned_tweet_id')
             requested_user = requested_user_resp.data
-            is_me = (requested_user.id == me.id)
+            if requested_user is None:
+                raise NoSuchUser
+            else:
+                is_me = (requested_user.id == me.id)
         else:
             screenname=me.username
             requested_user = me
@@ -487,6 +493,21 @@ def handle_already_authorised(request, access_credentials):
         }
         response = render(request, "displayresults.html", context)
         set_cookie(response, settings.TWITTER_CREDENTIALS_COOKIE, access_credentials[0] + ':' + access_credentials[1])
+        return response
+    except NoSuchUser:
+        context = {
+          'error_message': f'The requested Twitter user @{screenname} does not exist.',
+          'requested_name': screenname,
+          'pseudolists': extract_mastodon_ids.pseudolists,
+          'mastodon_id_users': [],
+          'keyword_users': [],
+          'n_users_searched': 0,
+          'requested_user': None,
+          'me': None,
+          'is_me': False,
+          'csv': None
+        }
+        response = render(request, "displayresults.html", context)
         return response
     except tweepy.TooManyRequests:
         context = {
