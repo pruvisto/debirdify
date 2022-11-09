@@ -85,7 +85,6 @@ class Instance:
             self.software = software.lower()
         self.software_version = software_version
         self.registrations_open = mk_bool(registrations_open)
-        print(self.registrations_open, registrations_open)
         self.users = mk_int(users)
         self.active_month = mk_int(active_month)
         self.active_halfyear = mk_int(active_halfyear)
