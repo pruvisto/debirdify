@@ -455,7 +455,7 @@ def handle_already_authorised(request, access_credentials):
         most_relevant_instances = list()
         for inst, us in mastodon_ids_by_instance.items():
             if inst.users is None or len(us) <= 2: continue
-            inst.score = 1 / (-math.log(len(us) / inst.users) * math.log(inst.users)) * 1000
+            inst.score = 1 / (2 - math.log(len(us) / inst.users) * math.log(inst.users)) * 1000
             most_relevant_instances.append(inst)
         most_relevant_instances.sort(key = (lambda inst: inst.score), reverse = True)
         n_most_relevant = 20
