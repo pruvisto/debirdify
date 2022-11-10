@@ -375,37 +375,44 @@ def extract_mastodon_ids_from_users_raw(client, users, known_host_callback = Non
     results = Results()
     errors = list()
     if not users: return results, errors
+    page = 1
     
-    for us in chunks_of(users, 100):
-        resp = client.get_users(
-                usernames = ','.join([u.name for u in us]), 
-                user_auth=True, 
-                user_fields=['name', 'username', 'description', 'entities', 'location', 'pinned_tweet_id'],
-                tweet_fields=['entities'], 
-                expansions='pinned_tweet_id')
-        if resp.data is None: continue
-        n = len(us)
-        i = 0
-        
-        us_dict = dict()
-        for u in us:
-            try:
-                s = u.name.lower()
-                us_dict[s].append(u)
-            except KeyError:
-                us_dict[s] = [u]
-
-        for u in resp.data:
-            if u is not None:
-                results.n_users += 1
+    try:
+        for us in chunks_of(users, 100):
+            resp = client.get_users(
+                    usernames = ','.join([u.name for u in us]), 
+                    user_auth=True, 
+                    user_fields=['name', 'username', 'description', 'entities', 'location', 'pinned_tweet_id'],
+                    tweet_fields=['entities'], 
+                    expansions='pinned_tweet_id')
+            if resp.data is None: continue
+            n = len(us)
+            i = 0
+            
+            us_dict = dict()
+            for u in us:
                 try:
-                    del us_dict[u.username.lower()]
+                    s = u.name.lower()
+                    us_dict[s].append(u)
                 except KeyError:
-                    pass
-        for errs in us_dict.values():
-            for err in errs:
-                errors.append(err)
-        extract_mastodon_ids_from_users(client, resp, results, known_host_callback=known_host_callback)
+                    us_dict[s] = [u]
+
+            for u in resp.data:
+                if u is not None:
+                    results.n_users += 1
+                    try:
+                        del us_dict[u.username.lower()]
+                    except KeyError:
+                        pass
+            for errs in us_dict.values():
+                for err in errs:
+                    errors.append(err)
+            extract_mastodon_ids_from_users(client, resp, results, known_host_callback=known_host_callback)
+            page += 1
+
+    except tweepy.TooManyRequests as e:
+        if page == 1: raise e
+
     return results, errors
 
 def extract_mastodon_ids_from_pseudolist(client, requested_user, pl, known_host_callback = None):
