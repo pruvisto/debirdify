@@ -139,7 +139,8 @@ class MastodonID:
         return '{}@{}'.format(self.user_part, self.host_part)
         
     def url(self):
-        return 'https://{}/@{}'.format(self.instance().local_domain, self.user_part)
+#        return 'https://{}/@{}'.format(self.instance().local_domain, self.user_part)
+        return 'https://{}/@{}'.format(self.host_part, self.user_part)
         
     def __eq__(self, other):
         return self.user_part == other.user_part and self.host_part == other.host_part
