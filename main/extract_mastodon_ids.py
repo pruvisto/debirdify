@@ -1,8 +1,12 @@
 import re
 from itertools import islice
 from functools import partial
+from urllib.parse import urlparse
 import tweepy
 import requests
+from urlextract import URLExtract
+
+from .instance import Instance, get_instance
 
 # Max pages of lists to query (1 page is roughly 100 lists)
 max_lists_pages = 5
@@ -65,7 +69,7 @@ _forbidden_hosts = {
 # We do not match everything of the form foo@bar or foo@bar.bla to avoid false positives like email addresses
 _id_pattern1 = re.compile(r'(@|🐘|Mastodon:?)?\s*?([\w\-\.]+@[\w\-\.]+\.[\w\-\.]+)', re.IGNORECASE)
 _id_pattern2 = re.compile(r'\b((http://|https://)?([\w\-\.]+\.[\w\-\.]+)/(web/)?@([\w\-\.]+))/?\b', re.IGNORECASE)
-_url_pattern = re.compile(r'^(http://|https://)([\w\-\.]+\.[\w\-\.]+)/(web/)?@([\w\-\.]+)/?$', re.IGNORECASE)
+_url_path_pattern = re.compile(r'^/(@|web/@?)([\w\-\.]+)(/.*|[.:,;!?()\[\]{}].*)?$', re.IGNORECASE)
 
 def is_forbidden_host(h):
     xs = h.lower().split('.')
@@ -79,6 +83,10 @@ def matches_host_heuristic(s):
         if kw in xs: return True
     return None
 
+_mastodon_id_pattern = re.compile('[\w\-\.]+')
+
+def is_valid_mastodon_id(s):
+    return _mastodon_id_pattern.match(s) is not None
 
 class InstanceValidator:
     def __init__(self, known_host_callback=None, mode='strict'):
@@ -109,7 +117,9 @@ class InstanceValidator:
     
     # for modes see "is_fediverse_host"
     def make_mastodon_id(self, u, h, original = None):
-        if self.validate_host(h):
+        if not is_valid_mastodon_id(u):
+            return None
+        elif self.validate_host(h):
             return MastodonID(u, h, original = original)
         else:
             return None
@@ -136,9 +146,12 @@ class MastodonID:
         
     def __hash__(self):
         return hash((self.user_part, self.host_part))
-        
+
+    def instance(self):
+        return get_instance(self.host_part)
+
     def query_exists(self):
-        url = f'https://{self.host_part}/.well-known/webfinger?resource=acct:{self}'
+        url = self.instance().webfinger_url + f'?resource=acct:{self}'
         try:
             resp = requests.head(url, timeout=2, allow_redirects=True)
             if resp.status_code == 404:
@@ -248,7 +261,19 @@ class Results:
 
 def is_mastodon_id_char(s):
     return s.isalnum() or s == '_'
-    
+
+def mk_mastodon_id_from_url(validator, url_str):
+    try:
+        url = urlparse(url_str)
+        if url.scheme not in ('', 'http', 'https'):
+            return None
+        h_str = url.hostname
+        match = _url_path_pattern.match(url.path)
+        u_str = match[2]
+        return validator.make_mastodon_id(u_str, h_str, original = url_str)
+    except Exception as e:
+        return None
+
 # client: a tweepy.Client object
 # requested_user: a tweepy.User object
 # returns:
@@ -259,6 +284,7 @@ def extract_mastodon_ids_from_users(client, resp, results, known_host_callback =
     if resp.data is None: return
     lax_validator = InstanceValidator(known_host_callback=known_host_callback, mode = 'lax')
     strict_validator = InstanceValidator(known_host_callback=known_host_callback, mode = 'strict')
+    extractor = URLExtract()
     
     # Takes a Mastodon ID in the format @foo@bar.tld or foo@bar.tld and returns
     # a MastodonID object. If the string starts with an @, lax host validation is performed
@@ -296,11 +322,11 @@ def extract_mastodon_ids_from_users(client, resp, results, known_host_callback =
             pinned_tweet_text = ""
             
         extras = None
+        mastodon_ids = set()
+
         # Parse Mastodon IDs of the form @foo@bar.tld or foo@bar.tld
         # Strict host validation is performed in the second form (i.e. must not be forbidden,
         # must pass heuristic or be a known host)
-        mastodon_ids = set()
-        
         for text in [name, location, bio, pinned_tweet_text]:
             if text is None: continue
             for prefix, s in _id_pattern1.findall(text):
@@ -310,30 +336,27 @@ def extract_mastodon_ids_from_users(client, resp, results, known_host_callback =
                 if mid is not None: mastodon_ids.add(mid)
 
         # Now we check for URLs of the form bar.tld/@foo or bar.tld/web/@foo
-        # We use lax validation, i.e. unless the host is explicitly in the forbidden
-        # list we assume it is genuine.
-
-        # Check URLs in entities of bio, website, pinned tweet for 
+        # Strict validation is always used.
+        
+        # check URLs in entities
         for url in extract_urls_from_user(u) + extract_urls_from_tweet(pinned_tweet):
-            for _, h_str, _, u_str in _url_pattern.findall(url):
-                mid = strict_validator.make_mastodon_id(u_str, h_str, original = url)
-                if mid is not None: mastodon_ids.add(mid)
+            mid = mk_mastodon_id_from_url(strict_validator, url)
+            if mid is not None: mastodon_ids.add(mid)
 
-        # Check for URLs in name and location
-        for s in (name, location):
+        # Check for weird malformed pure text URLs
+        for s in (name, location, bio, pinned_tweet_text):
             if s is None: continue
             for entire_match, _, h_str, _, u_str in _id_pattern2.findall(s):
                 mid = strict_validator.make_mastodon_id(u_str, h_str, original = entire_match)
                 if mid is not None: mastodon_ids.add(mid)
-        
-        # Check for URLs in screenname, bio pinned_tweet
-        texts = [screenname, bio]
-        if pinned_tweet is not None: texts.append(pinned_tweet.text)
-        for text in texts:
-            for entire_match, _, h_str, _, u_str in _id_pattern2.findall(text):
-                mid = strict_validator.make_mastodon_id(u_str, h_str, original = entire_match)
+
+        # Check for pure text URLs
+        for s in (name, location, bio, pinned_tweet_text):
+            if s is None: continue
+            for url in extractor.find_urls(s):
+                mid = mk_mastodon_id_from_url(strict_validator, url)
                 if mid is not None: mastodon_ids.add(mid)
-                
+        
         mastodon_ids = list(mastodon_ids)
         mastodon_ids.sort(key=(lambda mid: str(mid)))
         
