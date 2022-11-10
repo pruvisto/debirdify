@@ -233,6 +233,7 @@ def handle_already_authorised(request, access_credentials):
         n_users = None
         action_taken = True
         uploaded_list_errors = {}
+        n_accounts_found = 0
 
         if 'getfollowed' in request.POST:
             action = 'getfollowed'
@@ -306,6 +307,8 @@ def handle_already_authorised(request, access_credentials):
             mid_results, extra_results = results.get_results()
             n_users = results.n_users
 
+        n_accounts_found = sum([len(u.mastodon_ids) for u in mid_results])
+
         mastodon_ids_by_instance = dict()
         for u in mid_results:
             for mid in u.mastodon_ids:
@@ -357,6 +360,7 @@ def handle_already_authorised(request, access_credentials):
         context = {
             'action': action,
             'mastodon_id_users': mid_results,
+            'n_accounts_found': n_accounts_found,
             'mastodon_ids_by_instance': mastodon_ids_by_instance_list,
             'service_stats': service_stats,
             'max_score': max_score,
