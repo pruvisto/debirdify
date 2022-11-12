@@ -5,6 +5,7 @@ from urllib.parse import urlparse
 import tweepy
 import requests
 from urlextract import URLExtract
+from defusedxml import ElementTree
 
 from .instance import Instance, get_instance
 
@@ -128,12 +129,20 @@ class InstanceValidator:
 # Matches some key words that might occur in bios
 _keyword_pattern = re.compile(r'.*(mastodon|toot|tröt|fedi).*', re.IGNORECASE)
 
+def parse_hostmeta(s):
+    try:
+        t = ET.fromstring(s)
+        
+    except ET.ParseError:
+        return None
+
 class MastodonID:
     def __init__(self, user_part, host_part, original = None):
         self.user_part = user_part.lower()
         self.host_part = host_part.lower()
         self.original = original
         self.exists = None
+        self._webfinger_template = None
 
     def __str__(self):
         return '{}@{}'.format(self.user_part, self.host_part)
@@ -152,7 +161,26 @@ class MastodonID:
         return get_instance(self.host_part)
 
     def query_exists(self):
-        url = self.instance().webfinger_url + f'?resource=acct:{self}'
+        webfinger_template = self._webfinger_template
+        if webfinger_template is None:
+            try:
+                url = f'https://{self.host_part}/.well-known/host-meta'
+                resp = requests.get(url, allow_redirects=True, headers = {'Accept': 'application/xrd+xml'})
+                if resp.status_code != 200:
+                    return None
+                t = ElementTree.fromstring(resp.content, forbid_dtd = True)
+                if re.match('^(\{[^{}]*\})?XRD$', t.tag) is not None:
+                    for c in t.findall("./{*}Link[@rel='lrdd'][@template]"):
+                        self._webfinger_template = c.attrib['template']
+                        webfinger_template = self._webfinger_template
+                        break
+            except:
+                pass
+            if webfinger_template is None:
+                webfinger_template = f'https://{self.host_part}/.well-known/webfinger?resource=' + '{uri}'
+
+        webfinger_url = webfinger_template.replace('{url}', str(self))
+
         try:
             resp = requests.head(url, timeout=2, allow_redirects=True)
             if resp.status_code == 404:
@@ -166,7 +194,6 @@ class MastodonID:
         except:
             self.exists = 'error'
         return self.exists
-        
 
 class UserResult:
     def __init__(self, uid, name, screenname, bio, mastodon_ids, extras):
