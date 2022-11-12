@@ -1,11 +1,12 @@
 import re
 from itertools import islice
 from functools import partial
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
 import tweepy
 import requests
 from urlextract import URLExtract
 from defusedxml import ElementTree
+import json
 
 from .instance import Instance, get_instance
 
@@ -71,6 +72,7 @@ _forbidden_hosts = {
 _id_pattern1 = re.compile(r'(@|🐘|Mastodon:?)?\s*?([\w\-\.]+@[\w\-\.]+\.[\w\-\.]+)', re.IGNORECASE)
 _id_pattern2 = re.compile(r'\b((http://|https://)?([\w\-\.]+\.[\w\-\.]+)/(web/)?@([\w\-\.]+))/?\b', re.IGNORECASE)
 _url_path_pattern = re.compile(r'^/(@|web/@?)([\w\-\.]+)(/.*|[.:,;!?()\[\]{}].*)?$', re.IGNORECASE)
+_profile_page_pattern = re.compile(r'https?://webfinger.net/rel/profile-page', re.IGNORECASE)
 
 def is_forbidden_host(h):
     xs = h.lower().split('.')
@@ -160,29 +162,29 @@ class MastodonID:
     def instance(self):
         return get_instance(self.host_part)
 
-    def query_exists(self):
+    def webfinger_template(self):
         webfinger_template = self._webfinger_template
         if webfinger_template is None:
             try:
                 url = f'https://{self.host_part}/.well-known/host-meta'
                 resp = requests.get(url, allow_redirects=True, headers = {'Accept': 'application/xrd+xml'})
-                if resp.status_code != 200:
-                    return None
-                t = ElementTree.fromstring(resp.content, forbid_dtd = True)
-                if re.match('^(\{[^{}]*\})?XRD$', t.tag) is not None:
-                    for c in t.findall("./{*}Link[@rel='lrdd'][@template]"):
-                        self._webfinger_template = c.attrib['template']
-                        webfinger_template = self._webfinger_template
-                        break
+                if resp.status_code == 200:
+                    t = ElementTree.fromstring(resp.content, forbid_dtd = True)
+                    if re.match('^(\{[^{}]*\})?XRD$', t.tag) is not None:
+                        for c in t.findall("./{*}Link[@rel='lrdd'][@template]"):
+                            self._webfinger_template = c.attrib['template']
+                            webfinger_template = self._webfinger_template
+                            break
             except:
                 pass
             if webfinger_template is None:
                 webfinger_template = f'https://{self.host_part}/.well-known/webfinger?resource=' + '{uri}'
-
-        webfinger_url = webfinger_template.replace('{url}', str(self))
-
+        return webfinger_template
+        
+    def query_exists(self):
+        webfinger_url = self.webfinger_template().replace('{uri}', str(self))
         try:
-            resp = requests.head(url, timeout=2, allow_redirects=True)
+            resp = requests.head(webfinger_url, timeout=2, allow_redirects=True)
             if resp.status_code == 404:
                 self.exists = False
             elif resp.status_code == 403:
@@ -191,9 +193,31 @@ class MastodonID:
                 self.exists = True
             else:
                 self.exists = None
-        except:
+        except Exception as e:
             self.exists = 'error'
         return self.exists
+        
+    def profile_url(self):
+        webfinger_url = self.webfinger_template().replace('{uri}', str(self))
+        try:
+            resp = requests.get(webfinger_url, timeout=5, allow_redirects=True)
+            if resp.status_code == 200:
+                dat = json.loads(resp.content)
+                for x in dat['links']:
+                    if _profile_page_pattern.match(x['rel']) is None:
+                        continue
+                    url = urlparse(x['href'])
+                    if url.scheme not in ('', 'http', 'https'):
+                        continue
+                    if url.scheme == '':
+                        url = url._replace(scheme = 'https')
+                    return urlunparse(url) 
+            else:
+                return None
+        except Exception as e:
+            pass
+        return None
+        
 
 class UserResult:
     def __init__(self, uid, name, screenname, bio, mastodon_ids, extras):

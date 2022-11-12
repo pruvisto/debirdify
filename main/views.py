@@ -1,4 +1,4 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from django.conf import settings
 from django.views.decorators.gzip import gzip_page
@@ -453,6 +453,16 @@ def try_get_twitter_credentials(request):
     xs = request.COOKIES[settings.TWITTER_CREDENTIALS_COOKIE].split(':')
     if len(xs) != 2: return None
     return xs[0].strip(), xs[1].strip()
+
+def profile(request):
+    if 'user' not in request.GET or 'host' not in request.GET:
+        return render(request, "error2.html", {})
+    user = extract_mastodon_ids.MastodonID(request.GET['user'], request.GET['host'])
+    url = user.profile_url()
+    if url is None:
+        print('URL was None!')
+        url = f'https://{user.host_part}/@{user.user_part}'
+    return redirect(url)
 
 @gzip_page
 @csrf_protect

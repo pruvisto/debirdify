@@ -32,7 +32,7 @@
       <ul>
       {% for mid in requested_user_mastodon_ids %}
         {% spaceless %}
-        <li class="mids"><a href="{{ mid|mid_url }}">{{ mid }}</a>&nbsp;
+        <li class="mids"><a href="./profile?user={{ mid.user_part|urlencode }}&host={{ mid.host_part|urlencode }}">{{ mid }}</a>&nbsp;
         {% if mid.exists == 'forbidden' %}❓<br>This server blocks our request. Consider contacting the server admins about it.
         {% elif mid.exists == True %}✔️
         {% elif mid.exists == False %}❌<br>This account does not exist. Do you perhaps have a typo?
@@ -46,7 +46,7 @@
       <p>We found some things in {% if is_me %}<a href="https://twitter.com/{{ me.username }}">your</a>{% else %}<a href="https://twitter.com/{{ requested_user.username }}">@{{ requested_user.username }}</a>'s{%endif%} Twitter profile that might be Fediverse IDs, but we are not sure enough about it to include it in the search results.{% if is_me %}If these are genuine, please consider writing them in the suggested form to ensure tools like Debirdify will pick them up.{% endif %}
       </p>
       <ul>
-      {% for mid in requested_user_broken_mastodon_ids %}<li>{{ mid.original }} {% if mid.exists %}✔️{% else %}❌{% endif %}<br>{% if not mid.exists %}This does not seem to be a Fediverse account (or the server responds too slowly).{% else %}Suggested form: <a href="{{ mid.url }}">@{{ mid }}</a>{% endif %}</li>{% endfor %}
+      {% for mid in requested_user_broken_mastodon_ids %}<li>{{ mid.original }} {% if mid.exists %}✔️{% else %}❌{% endif %}<br>{% if not mid.exists %}This does not seem to be a Fediverse account (or the server responds too slowly).{% else %}Suggested form: <a href="./profile?user={{ mid.user_part|urlencode }}&host={{ mid.host_part|urlencode }}">@{{ mid }}</a>{% endif %}</li>{% endfor %}
       </ul>
       <p>Debirdify cannot do an in-depth check like this for every questionable ID on a normal search, so unless it is fairly certain that something is a Fediverse ID, it will be ignored.</p>
     {% endif %}
@@ -253,7 +253,7 @@ mkChart('service_distribution', 'service_distribution_container', 'Service Distr
     <dl class="users" style="margin-top: 1em; margin-left: 0">
     {% for u, mid in us %}
       <dt class="users"><a href="https://twitter.com/{{ u.screenname|urlencode }}" class="twitter_acc_link" target="_blank"><span class="displayname">{{ u.name }}</span> <span class="screenname">{{ u.screenname }}</span></a></dt>
-      <dd class="users" style="margin-left: 0; "><a href="{{ mid|mid_url }}">{{ mid }}</a></dd>
+      <dd class="users" style="margin-left: 0; "><a href="./profile?user={{ mid.user_part|urlencode }}&host={{ mid.host_part|urlencode }}">{{ mid }}</a></dd>
     {% endfor %}
   </dl>
   </li>
