@@ -2,6 +2,7 @@ from django.db import connection
 import json
 import datetime
 import secrets
+import psycopg2
 
 def _format_datetime(d):
     if d is None:
