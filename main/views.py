@@ -692,9 +692,16 @@ batch_list_empty_message = 'The list you uploaded contained no valid Twitter use
 def format_access_credentials(access_credentials):
     return access_credentials[0] + ':' + access_credentials[1]
 
+def ensure_privilege(username, privilege):
+    with connection.cursor() as cur:
+        cur.execute('SELECT privilege FROM privileges WHERE username=%s AND privilege=%s LIMIT 1', [username.lower(), privilege.lower()])
+        if cur.fetchone() is None:
+            raise PermissionDenied
+
 def handle_batch(request, client, access_credentials):
     me_resp = client.get_me(user_auth=True)
     me = me_resp.data
+    ensure_privilege(me.username, 'batch')    
     job = batchtools.get(me.id)
     
     if 'abort' in request.POST:

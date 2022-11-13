@@ -27,7 +27,7 @@ db_user = 'debirdify'
 db_password = env('DEBIRDIFY_INSTANCE_DB_PASSWORD')
 con = psycopg2.connect(f"dbname=debirdify user={db_user} host=localhost password={db_password}")
 sleep_time = 1
-MAX_SLEEP_TIME = 4
+MAX_SLEEP_TIME = 16
 
 def reset_sleep_time():
     global sleep_time
