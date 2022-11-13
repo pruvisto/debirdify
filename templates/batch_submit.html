@@ -1,5 +1,17 @@
 {% include "header.html" %}
 
+<script>
+function request_notification_permissions() {
+  if (!(Notification.permission === 'granted')) {
+      Notification.requestPermission();
+  }
+}
+
+window.addEventListener('load', (event) => {
+  request_notification_permissions();
+});
+</script>
+
 <p>Logged in as: @{{ me.username }}</p>
 
 {% if message %}
@@ -32,6 +44,7 @@
 {% csrf_token %}
 <p><label for="job_name" style="margin-right: 0.5em">Job name:</label> <input type="text" id="job_name" name="job_name" placeholder="&lt;untitled&gt;"></p>
 <p><input type="file" id="uploaded_list" name="uploaded_list" multiple></p>
+<p><button onclick="request_notification_permissions()" type="button">Enable notifications</button></p>
 <p><input type="submit" name="submit" value="Submit" style=""></p>
 </form>
 

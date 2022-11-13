@@ -1,4 +1,15 @@
 {% include "header.html" %}
+<script>
+function request_notification_permissions() {
+  if (!(Notification.permission === 'granted')) {
+      Notification.requestPermission();
+  }
+}
+
+window.addEventListener('load', (event) => {
+  request_notification_permissions();
+});
+</script>
 
 <p>Logged in as: @{{me.username}}</p>
 
@@ -54,6 +65,18 @@ Your job ‘{{job.name}}’ (#{{job.id}}), started at {{job.t_launched_str}}, wa
 const job_secret = '{{ job.text_id }}';
 const size = parseInt('{{ job.size }}');
 
+const icon_url = 'https://pruvisto.org/debirdify_static/debirdify.png';
+
+function do_notify() {
+    if (Notification.permission === 'granted') {
+        notification = new Notification('Batch job complete', {
+                body: 'Your batch job ‘{{job.name|escapejs}}’ (#{{job.id|escapejs}}) executed successfully. Click here to view the results.',
+                icon: icon_url
+        });
+        notification.onclick=((event) => {event.preventDefault(); window.open('./?job_secret=' + job_secret);});
+    }
+}
+
 async function fetchWithTimeout(resource) {
   const controller = new AbortController();
   const id = setTimeout(() => controller.abort(), 5000);
@@ -72,14 +95,18 @@ async function refresh() {
                 const percentSpan = document.getElementById('percent_num');
                 const progressSpan = document.getElementById('progress_num');
                 const progressBar = document.getElementById('progress_bar');
+                const progressMessage = document.getElementById('progress_message');
+                const viewResultsForm = document.getElementById('view_results_form');
                 const progress = data['progress'];
                 const time_completed = data['completed'];
                 const percent = (parseInt(progress)/size*100).toFixed(1);
+                viewResultsForm.style.display = 'block';
                 progressSpan.textContent = progress;
                 percentSpan.textContent = percent;
                 progressBar.style.width = percent + '%';
                 if (time_completed != null) {
-                  window.location.replace('./batch');
+                    progressMessage.textContent = 'Your job ‘{{job.name|escapejs}}’ (#{{job.id|escapejs}}), started at {{job.t_launched_str|escapejs}}, finished at ' + time_completed + '.';
+                  do_notify();
                 } else {            
                   setTimeout(refresh, 5000);
                 }
@@ -104,13 +131,20 @@ if (document.readyState === 'complete') {
 }
 </script>
 
-<p>Your job ‘{{job.name}}’ (#{{job.id}}) has been running since {{job.t_launched_str}}.</p>
+<p id="progress_message">Your job ‘{{job.name}}’ (#{{job.id}}) has been running since {{job.t_launched_str}}.</p>
 <p>Current progress: <span id="percent_num">{{job.progress_percentage}}</span>&thinsp;% (<span id="progress_num">{{job.progress}}</span> / {{job.size}})</p>
 <div style="width: 60%; margin-left: 1em; margin-right: 1em; border-radius: 0.2em; border: 1px solid #444;">
 <div class="ranking_bar" id="progress_bar" style="width: {{ job.progress_percentage }}%; height: 1em; background-color: #88f; border-radius: 0.2em;"></div>
 </div>
+
+<form id="view_results_form" style="display:none" action="./" method="get">
+<input type="hidden" name="job_secret" value="{{ job.text_id }}"></p>
+<p><input type="submit" name="view" value="View Results" style=""></p>
+</form>
+
 <form action="./batch" method="post">
 {% csrf_token %}
+<p><button onclick="request_notification_permissions()" type="button">Enable notifications</button></p>
 <p><input type="submit" name="abort" value="Abort" style=""></p>
 </form>
 {% endif %}

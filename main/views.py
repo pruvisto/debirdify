@@ -757,7 +757,7 @@ def batch_progress(request):
         cur.execute('SELECT progress, time_completed FROM batch_jobs WHERE text_id=%s LIMIT 1', [request.GET['job_secret']])
         progress, time_completed = cur.fetchone()
         if time_completed is not None:
-            time_completed = time_completed.isoformat()
+            time_completed = batchtools.format_datetime(time_completed)
         return JsonResponse({'progress': progress, 'completed': time_completed})
 
 @gzip_page

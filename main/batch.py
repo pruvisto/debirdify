@@ -3,8 +3,9 @@ import json
 import datetime
 import secrets
 import psycopg2
+from psycopg2.extras import execute_values
 
-def _format_datetime(d):
+def format_datetime(d):
     if d is None:
         return None
     return d.strftime('%d.%m.%Y %H:%M:%S')
@@ -15,13 +16,13 @@ class BatchJob:
         self.text_id = text_id
         self.name = name
         self.t_launched = t_launched
-        self.t_launched_str = _format_datetime(self.t_launched)
+        self.t_launched_str = format_datetime(self.t_launched)
         self.t_completed = t_completed
-        self.t_completed_str = _format_datetime(self.t_completed)
+        self.t_completed_str = format_datetime(self.t_completed)
         self.t_updated = t_updated
-        self.t_updated_str = _format_datetime(self.t_updated)
+        self.t_updated_str = format_datetime(self.t_updated)
         self.t_aborted = t_aborted
-        self.t_aborted_str = _format_datetime(self.t_aborted)
+        self.t_aborted_str = format_datetime(self.t_aborted)
         self.progress = progress
         if self.progress is None: self.progress = 0
         self.size = size
@@ -61,11 +62,12 @@ def launch(*, uid, access_credentials, name, requested_users):
             try:
                 text_id = secrets.token_urlsafe(32)
                 cur.execute('INSERT INTO batch_jobs (name, uid, size, access_credentials, text_id) VALUES (%s, %s, %s, %s, %s) RETURNING id', [name, uid, size, access_credentials, text_id])
+                t_launched = datetime.datetime.now()
                 break
             except psycopg2.errors.UniqueViolation:
                 pass
         job_id = cur.fetchone()[0]
         reqs = [x for u in requested_users if (x := _mk_request_from_user(job_id, u)) is not None]
-        cur.executemany('INSERT INTO batch_job_requests (job_id, uid, username) VALUES (%s, %s, %s)', reqs)
-        return BatchJob(id = job_id, text_id = text_id, size = size, name = name, t_launched = datetime.datetime.now())
+        execute_values(cur, 'INSERT INTO batch_job_requests (job_id, uid, username) VALUES %s', reqs, page_size=1000)
+        return BatchJob(id = job_id, text_id = text_id, size = size, name = name, t_launched = t_launched)
 

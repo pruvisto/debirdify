@@ -4,6 +4,7 @@ import time
 import os
 import extract_mastodon_ids
 import traceback
+from psycopg2.extras import execute_values
 
 def env(s):
    if s not in os.environ:
@@ -27,7 +28,7 @@ db_user = 'debirdify'
 db_password = env('DEBIRDIFY_INSTANCE_DB_PASSWORD')
 con = psycopg2.connect(f"dbname=debirdify user={db_user} host=localhost password={db_password}")
 sleep_time = 1
-MAX_SLEEP_TIME = 16
+MAX_SLEEP_TIME = 8
 
 def reset_sleep_time():
     global sleep_time
@@ -84,7 +85,7 @@ def handle_requests(*, client, by_id, requests):
         else:
             return '{}'
     
-    return [(mk_result(x), rid) for rid, x in requests]
+    return [(rid, mk_result(x)) for rid, x in requests]
 
 def delete_orphans(con):
     with con.cursor() as cur:
@@ -102,7 +103,7 @@ def handle_job(job_id, name, access_credentials):
         try:
             if rows:
                 results = handle_requests(client = client, by_id = True, requests = rows)
-                cur.executemany('UPDATE batch_job_requests SET result=%s WHERE id=%s', results)
+                execute_values(cur, 'UPDATE batch_job_requests AS R SET result=D.result FROM (VALUES %s) AS D (id, result) WHERE R.id=D.id', results)
             else:
                 cur.execute('SELECT id, username FROM batch_job_requests WHERE job_id=%s AND username IS NOT NULL AND result IS NULL LIMIT 100', [job_id])
                 rows = cur.fetchall()
