@@ -96,11 +96,11 @@ async function refresh() {
                 const progressSpan = document.getElementById('progress_num');
                 const progressBar = document.getElementById('progress_bar');
                 const progressMessage = document.getElementById('progress_message');
-                const viewResultsForm = document.getElementById('view_results_form');
+                const viewResultsButton = document.getElementById('view_results_button');
                 const progress = data['progress'];
                 const time_completed = data['completed'];
                 const percent = (parseInt(progress)/size*100).toFixed(1);
-                viewResultsForm.style.display = 'block';
+                viewResultsButton.style.display = 'inline';
                 progressSpan.textContent = progress;
                 percentSpan.textContent = percent;
                 progressBar.style.width = percent + '%';
@@ -137,9 +137,9 @@ if (document.readyState === 'complete') {
 <div class="ranking_bar" id="progress_bar" style="width: {{ job.progress_percentage }}%; height: 1em; background-color: #88f; border-radius: 0.2em;"></div>
 </div>
 
-<form id="view_results_form" style="display:none" action="./" method="get">
+<form action="./" method="get">
 <input type="hidden" name="job_secret" value="{{ job.text_id }}"></p>
-<p><input type="submit" name="view" value="View Results" style=""></p>
+<p><input id="view_results_button" type="submit" name="view" value="View Results" style="display:none"></p>
 </form>
 
 <form action="./batch" method="post">
