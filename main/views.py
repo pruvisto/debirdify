@@ -314,8 +314,23 @@ def show_error(request, message):
     response = render(request, "displayresults.html", context)
     return response
 
+def get_privileges(username):
+    with connection.cursor() as cur:
+        cur.execute('SELECT privilege FROM privileges WHERE username=%s', [username.lower()])
+        return set([row[0] for row in cur.fetchall()])
+    
+def has_privilege(username, privilege):
+    with connection.cursor() as cur:
+        cur.execute('SELECT privilege FROM privileges WHERE username=%s AND privilege=%s LIMIT 1', [username.lower(), privilege.lower()])
+        return cur.fetchone() is not None
+
+def ensure_privilege(username, privilege):
+    if not has_privilege(username, privilege):
+        raise PermissionDenied
+
 def handle_already_authorised(request, client, access_credentials):
     screenname = ''
+    privileges = set()
     try:
         me_resp = client.get_me(user_auth=True, user_fields=['name', 'username', 'description', 'entities', 'location', 'pinned_tweet_id', 'public_metrics'], tweet_fields=['entities'], expansions='pinned_tweet_id')
         me = me_resp.data
@@ -335,6 +350,8 @@ def handle_already_authorised(request, client, access_credentials):
             requested_user = me
             requested_user_resp = me_resp
             is_me = True
+            
+        privileges = get_privileges(me.username)
 
         def known_host_callback(s):
             try:
@@ -540,7 +557,8 @@ def handle_already_authorised(request, client, access_credentials):
             'csv': make_csv(mid_results),
             'full_csv': make_full_csv(all_results),
             'lists': lists,
-            'followed_lists': followed_lists
+            'followed_lists': followed_lists,
+            'privileges': privileges
         }
         response = render(request, "displayresults.html", context)
         set_cookie(response, settings.TWITTER_CREDENTIALS_COOKIE, access_credentials[0] + ':' + access_credentials[1])
@@ -556,7 +574,8 @@ def handle_already_authorised(request, client, access_credentials):
           'requested_user': None,
           'me': None,
           'is_me': False,
-          'csv': None
+          'csv': None,
+          'privileges': privileges
         }
         response = render(request, "displayresults.html", context)
         return response
@@ -571,7 +590,8 @@ def handle_already_authorised(request, client, access_credentials):
           'requested_user': None,
           'me': None,
           'is_me': 'screenname' not in request.POST,
-          'csv': None
+          'csv': None,
+          'privileges': privileges
         }
         response = render(request, "displayresults.html", context)
         return response
@@ -592,7 +612,8 @@ def handle_already_authorised(request, client, access_credentials):
           'requested_user': None,
           'me': None,
           'is_me': 'screenname' not in request.POST,
-          'csv': None
+          'csv': None,
+          'privileges': privileges
         }
         response = render(request, "displayresults.html", context)
         return response
@@ -691,12 +712,6 @@ batch_list_empty_message = 'The list you uploaded contained no valid Twitter use
 
 def format_access_credentials(access_credentials):
     return access_credentials[0] + ':' + access_credentials[1]
-
-def ensure_privilege(username, privilege):
-    with connection.cursor() as cur:
-        cur.execute('SELECT privilege FROM privileges WHERE username=%s AND privilege=%s LIMIT 1', [username.lower(), privilege.lower()])
-        if cur.fetchone() is None:
-            raise PermissionDenied
 
 def handle_batch(request, client, access_credentials):
     me_resp = client.get_me(user_auth=True)
