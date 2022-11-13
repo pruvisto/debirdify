@@ -64,7 +64,7 @@ async function fetchWithTimeout(resource) {
 
 async function refresh() {
     try {
-        const request = new Request('/batch/progress?job_secret=' + job_secret, {method: 'GET'});
+        const request = new Request('./batch/progress?job_secret=' + job_secret, {method: 'GET'});
         const response = await fetchWithTimeout(request);
         if (response.status == 200) {
             try {
