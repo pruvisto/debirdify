@@ -8,8 +8,6 @@ from urlextract import URLExtract
 from defusedxml import ElementTree
 import json
 
-from .instance import Instance, get_instance
-
 # Max pages of lists to query (1 page is roughly 100 lists)
 max_lists_pages = 5
 
@@ -168,28 +166,6 @@ class MastodonID:
     def __hash__(self):
         return hash((self.user_part, self.host_part))
 
-    def instance(self):
-        return get_instance(self.host_part)
-
-    def webfinger_template(self):
-        webfinger_template = self._webfinger_template
-        if webfinger_template is None:
-            try:
-                url = f'https://{self.host_part}/.well-known/host-meta'
-                resp = requests.get(url, allow_redirects=True, headers = {'Accept': 'application/xrd+xml'})
-                if resp.status_code == 200:
-                    t = ElementTree.fromstring(resp.content, forbid_dtd = True)
-                    if re.match('^(\{[^{}]*\})?XRD$', t.tag) is not None:
-                        for c in t.findall("./{*}Link[@rel='lrdd'][@template]"):
-                            self._webfinger_template = c.attrib['template']
-                            webfinger_template = self._webfinger_template
-                            break
-            except:
-                pass
-            if webfinger_template is None:
-                webfinger_template = f'https://{self.host_part}/.well-known/webfinger?resource=' + '{uri}'
-        return webfinger_template
-        
     def query_exists(self):
         webfinger_url = self.webfinger_template().replace('{uri}', str(self))
         try:
@@ -252,6 +228,12 @@ class UserResult:
                    self.extras.append(extra)
             self.extras.sort()
         self.is_on_fediverse = bool(self.mastodon_ids)
+        
+    def to_json(self):
+        mids = [str(mid) for mid in self.mastodon_ids]
+        extras = []
+        if not mids and extras: extras = [str(x) for x in self.extras]
+        return json.dumps({'uid': self.uid, 'name': self.name, 'screenname': self.screenname, 'mastodon_ids': mids, 'extras': extras})
 
 def extract_urls_from_user(u, known_host_callback = None):
     if u is None or u.entities is None: return []
@@ -299,26 +281,7 @@ def get_lists(client, requested_user, mode = 'normal'):
           next_token = None
         if next_token is None: break
     return results
-
-def user_result_from_json(src, json):
-    if 'uid' not in json: return None
-    uid = json['uid']
-    name = json['name']
-    screenname = json['screenname']
-    if 'mastodon_ids' in json:
-        def mk(s):
-            s = s.split('@')
-            return MastodonID(s[0], s[1])
-        mastodon_ids = [mk(x) for x in json['mastodon_ids']]
-    else:
-        mastodon_ids = []
-    if 'extras' in json:
-        extras = json['extras']
-    else:
-        extras = []
-    return UserResult(uid, src, name, screenname, '', mastodon_ids, extras)
-        
-
+    
 class Results:
     def __init__(self):
         self.results = dict()
@@ -480,7 +443,7 @@ def extract_mastodon_ids_from_users_raw(client, src, users, known_host_callback 
                         expansions='pinned_tweet_id')
             else:
                 resp = client.get_users(
-                        usernames = [str(u.screenname) for u in us], 
+                        usernames = [str(u.name) for u in us], 
                         user_auth=True, 
                         user_fields=['name', 'username', 'description', 'entities', 'location', 'pinned_tweet_id'],
                         tweet_fields=['entities'], 

@@ -1,0 +1,119 @@
+{% include "header.html" %}
+
+<p>Logged in as: @{{me.username}}</p>
+
+{% if message %}
+<p>{{ message }}</p>
+{% endif %}
+
+{% if uploaded_list_errors %}
+  <div style="border: 1px solid #a33; border-radius: 1em; padding-left: 1em; padding-right: 1em; padding-top: 0.2em; padding-bottom: 0.2em; background-color: #fbb">
+  <p style="font-weight: bold; margin-bottom: 0; margin-top: 0.4em;">File Processing Error</p>
+  <hr style="border: 1px solid #a33">
+  <p>Your uploaded lists contained Twitter handles/IDs that are invalid or do not exist.</p>
+  <dl>
+  {% for origin, errs in uploaded_list_errors %}
+    <dt style="margin-top: 0.8em">{% if origin.is_text_area %}Form input{% else %}Uploaded file <tt>{{ origin.name }}</tt>{% endif %}:</dt>
+    <dd>
+    {% for u in errs|slice:":20" %}
+      <li>{{ u.src.short }}: {% if u.src.original_form %}<tt>{{ u.src.original_form }}</tt>{% endif %}</li>
+    {% endfor %}
+    {% if errs|length > 20 %}
+      <li>…</li>
+    {% endif %}
+    </dd>
+  {% endfor %}
+  </dl>
+  </div>
+{% endif %}
+
+{% if job.completed %}
+<p>
+Your job ‘{{job.name}}’ (#{{job.id}}), started at {{job.t_launched_str}}, finished at {{job.t_completed_str}}.
+</p>
+<form action="./" method="get">
+<input type="hidden" name="job_secret" value="{{ job.text_id }}"></p>
+<p><input type="submit" name="view" value="View Results" style=""></p>
+</form>
+<form action="./batch" method="post">
+{% csrf_token %}
+<p><input type="submit" name="abort" value="Delete Results" style=""></p>
+</form>
+
+{% elif job.aborted %}
+<p>
+Your job ‘{{job.name}}’ (#{{job.id}}), started at {{job.t_launched_str}}, was aborted at {{job.t_aborted_str}}.
+</p>
+<form action="./batch" method="post">
+{% csrf_token %}
+<p><input type="submit" name="abort" value="Delete Job" style=""></p>
+</form>
+
+{% else %}
+<script>
+const job_secret = '{{ job.text_id }}';
+const size = parseInt('{{ job.size }}');
+
+async function fetchWithTimeout(resource) {
+  const controller = new AbortController();
+  const id = setTimeout(() => controller.abort(), 5000);
+  const response = await fetch(resource, {signal: controller.signal});
+  clearTimeout(id);
+  return response;
+}
+
+async function refresh() {
+    try {
+        const request = new Request('/batch/progress?job_secret=' + job_secret, {method: 'GET'});
+        const response = await fetchWithTimeout(request);
+        if (response.status == 200) {
+            try {
+                const data = await response.json();
+                const percentSpan = document.getElementById('percent_num');
+                const progressSpan = document.getElementById('progress_num');
+                const progressBar = document.getElementById('progress_bar');
+                const progress = data['progress'];
+                const time_completed = data['completed'];
+                const percent = (parseInt(progress)/size*100).toFixed(1);
+                progressSpan.textContent = progress;
+                percentSpan.textContent = percent;
+                progressBar.style.width = percent + '%';
+                if (time_completed != null) {
+                  window.location.replace('./batch');
+                } else {            
+                  setTimeout(refresh, 5000);
+                }
+            } catch(error) {
+                console.error(error);
+                setTimeout(refresh, 5000);
+            }
+        } else {
+            console.error('JSON request got status code: ' + response.status);
+            setTimeout(refresh, 5000);
+        }
+    } catch(error) {
+        console.error(error);    
+        setTimeout(refresh, 5000);
+    }
+}
+
+if (document.readyState === 'complete') {
+    setTimeout(refresh, 5000);
+} else {
+    document.addEventListener("DOMContentLoaded", () => setTimeout(refresh, 5000));
+}
+</script>
+
+<p>Your job ‘{{job.name}}’ (#{{job.id}}) has been running since {{job.t_launched_str}}.</p>
+<p>Current progress: <span id="percent_num">{{job.progress_percentage}}</span>&thinsp;% (<span id="progress_num">{{job.progress}}</span> / {{job.size}})</p>
+<div style="width: 60%; margin-left: 1em; margin-right: 1em; border-radius: 0.2em; border: 1px solid #444;">
+<div class="ranking_bar" id="progress_bar" style="width: {{ job.progress_percentage }}%; height: 1em; background-color: #88f; border-radius: 0.2em;"></div>
+</div>
+<form action="./batch" method="post">
+{% csrf_token %}
+<p><input type="submit" name="abort" value="Abort" style=""></p>
+</form>
+{% endif %}
+
+{% include "footer.html" %}
+</html>

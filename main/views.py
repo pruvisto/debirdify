@@ -1,8 +1,9 @@
 from django.shortcuts import render, redirect
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.conf import settings
 from django.views.decorators.gzip import gzip_page
 from django.views.decorators.csrf import csrf_protect
+from django.core.exceptions import PermissionDenied
 from django.db import connection
 import tweepy
 from tweepy import TweepyException
@@ -11,20 +12,63 @@ import datetime
 import traceback
 import math
 import codecs
+import json
 from io import TextIOWrapper
 from functools import total_ordering
 
 from . import extract_mastodon_ids
 from .instance import Instance, get_instance
+from .json_path import *
+from . import batch as batchtools
 
 class RequestedUserSrc:
+    pass    
+
+@total_ordering
+class RequestedUserPlainSrc(RequestedUserSrc):
     def __init__(self, original_form, origin, line):
         self.original_form = original_form
         self.origin = origin
         self.line = line
+        self.short = f'line {self.line}'
+        
+    def __eq__(self, other):
+        return (isinstance(other, RequestedUserPlainSrc)
+            and self.original_form == other.original_form
+            and self.origin == other.origin
+            and self.line == other.line)
+    
+    def __lt__(self, other):
+        if not isinstance(other, RequestedUserPlainSrc):
+            return True
+        return (self.line, self.origin, self.original_form) < (other.line, other.origin, other.original_form)
         
     def __str__(self):
         return f'{self.origin}, line {self.line}'
+
+@total_ordering
+class RequestedUserJSONSrc(RequestedUserSrc):
+    def __init__(self, original_form, origin, path):
+        self.origin = origin
+        self.path = path
+        self.short = str(path)
+        self.original_form = original_form
+
+    def __eq__(self, other):
+        return (isinstance(other, RequestedUserJSONSrc)
+            and self.origin == other.origin
+            and self.path == other.path
+            and self.original_form == other.original_form)
+    
+    def __lt__(self, other):
+        if isinstance(other, RequestedUserPlainSrc):
+            return False
+        if not isinstance(other, RequestedUserJSONSrc):
+            return True
+        return (self.origin, self.path, self.original_form) < (other.origin, other.path, self.original_form)
+
+    def __str__(self):
+        return f'{self.origin}, {self.path}'
 
 _twitter_handle_pattern = re.compile('^\s*@?([A-Za-z0-9_]{3,15})\s*$')
     
@@ -42,12 +86,12 @@ def parse_twitter_handles(origin, handles):
     for s in handles:
         line += 1
         if not s.strip(): continue
-        src = RequestedUserSrc(s, origin, line)
+        src = RequestedUserPlainSrc(s, origin, line)
         x = parse_twitter_handle(s)
         if x is None:
-            errors.append(extract_mastodon_ids.RequestedUser(s, src))
+            errors.append(extract_mastodon_ids.RequestedUser(src, screenname=s))
         else:
-            results.append(extract_mastodon_ids.RequestedUser(x, src))
+            results.append(extract_mastodon_ids.RequestedUser(src, screenname=x))
     return results, errors
     
 
@@ -78,12 +122,30 @@ def mk_oauth1():
     )
     
 def handle_auth_request(request):
-    oauth1_user_handler = mk_oauth1()
-    auth_url = oauth1_user_handler.get_authorization_url()
+    print(settings.TWITTER_CALLBACK_URL)
+    oauth1 = mk_oauth1()
+    auth_url = oauth1.get_authorization_url()
     return render(request, "auth.html", {'auth_url': auth_url})
 
 def make_csv(users):
     return '\n'.join(['Account address,Show boosts'] + ["{},true".format(mid) for u in users for mid in u.mastodon_ids])
+    
+_full_csv_fields = [
+    ('Twitter User ID', 'uid'),
+    ('Twitter user name', 'screenname'),
+    ('Twitter display name', 'name'),
+    ('Source', 'src'),
+    ('Is on Fediverse', 'is_on_fediverse')]
+    
+def make_full_csv(users):
+    from io import StringIO
+    import csv
+    with StringIO() as f:
+        w = csv.writer(f)
+        w.writerow([x for x, y in _full_csv_fields] + ['Fediverse IDs'])
+        for u in users:
+            w.writerow([getattr(u, y) for x, y in _full_csv_fields] + [mid for mid in u.mastodon_ids])
+        return f.getvalue()
 
 def increase_access_counter():
     pass
@@ -96,6 +158,7 @@ def increase_access_counter():
 class FileUploadError(Exception):
     pass
 
+@total_ordering
 class UploadedFileOrigin:
     def __init__(self, name):
         self.name = name
@@ -139,41 +202,124 @@ def group(xs, key):
             d[k] = [x]
     return d
 
+_json_archive_types = ['muting', 'blocking', 'following', 'follower']
+
+def parse_archive_json(origin, json_dat):
+    results = list()
+    
+    def add_result(uid, path, typ):
+        if not uid or not isinstance(uid, str) or not uid.isnumeric():
+            return
+        src = RequestedUserJSONSrc(uid, origin, path)
+        results.append(extract_mastodon_ids.RequestedUser(src, uid = uid, typ = typ))
+    
+    def go(x, path):
+        if isinstance(x, list):
+            i = 0;
+            for y in x:
+                go(y, JSONArrayItem(path, i))
+                i += 1
+        elif isinstance(x, dict):
+            for typ in _json_archive_types:
+                if typ in x and 'accountId' in x[typ]:
+                    add_result(x[typ]['accountId'], path, typ)
+            for key, val in x.items():
+                go(val, JSONDictItem(path, key))
+
+    go(json_dat, JSONRoot())
+    return results
+
+_archive_json_pat = re.compile(r'^\s*[A-Za-z0-9_\.]+\s*=\s*(.*)$', re.DOTALL)
+
+def read_archive_json(origin, s):
+    try:
+        m = _archive_json_pat.match(s)
+        if m is not None:
+            s = m[1]
+        print(s[:200])
+        json_dat = json.loads(s)
+        results = parse_archive_json(origin, json_dat)
+        for u in results:
+            print(u)
+        return results
+    except Exception as e:
+        raise e
+
 def read_uploaded_lists(request):
     us = list()
     errors = list()
     for f in request.FILES.getlist('uploaded_list'):
+        f_utf8 = TextIOWrapper(f, encoding="utf-8")
         file_src = UploadedFileOrigin(f.name)
+
+        # try to figure out of this is a JSON file from a Twitter archive
+        try:
+            return read_archive_json(file_src, f_utf8.read()), []
+        except:
+            pass
+    
+        # treating it as a plain list file
         line_no = 0
-        for l in TextIOWrapper(f, encoding="utf-8"):
+        for l in f_utf8:
             line_no += 1
             l = l.strip()
             if not l: continue
             x = parse_twitter_handle(l)
-            src = RequestedUserSrc(l, file_src, line_no)
+            src = RequestedUserPlainSrc(l, file_src, line_no)
             if x is None:
-                errors.append(extract_mastodon_ids.RequestedUser(l, src))
+                errors.append(extract_mastodon_ids.RequestedUser(src, screenname = l))
             else:
-                us.append(extract_mastodon_ids.RequestedUser(x, src))
+                us.append(extract_mastodon_ids.RequestedUser(src, screenname = x))
     return us, errors
     
 class NoSuchUser(Exception):
     pass
 
-def handle_already_authorised(request, access_credentials):
+def get_job_results(job_secret):
+    with connection.cursor() as cur:
+        cur.execute('SELECT id, name FROM batch_jobs WHERE text_id=%s', [job_secret])
+        row = cur.fetchone()
+        if row is None:
+            return None
+        job_id = row[0]
+        job_name = row[1]
+        cur.execute('SELECT result FROM batch_job_requests WHERE job_id=%s', [job_id])
+        results = extract_mastodon_ids.Results()
+        while (row := cur.fetchone()) is not None:
+            data = json.loads(row[0])
+            u = extract_mastodon_ids.user_result_from_json('Job ' + job_name, data)
+            if u is not None:
+                results.add(u)
+                results.n_users += 1
+        return results
+
+def show_error(request, message):
+    if 'screenname' in request.POST:
+        screenname = request.POST['screenname']
+        if screenname[:1] == '@': screenname = screenname[1:]
+    else:
+        screenname = ''
+    context = {
+      'error_message': message,
+      'requested_name': screenname,
+      'pseudolists': extract_mastodon_ids.pseudolists,
+      'mastodon_id_users': [],
+      'keyword_users': [],
+      'n_users_searched': 0,
+      'requested_user': None,
+      'me': None,
+      'is_me': 'screenname' not in request.POST,
+      'csv': None
+    }
+    response = render(request, "displayresults.html", context)
+    return response
+
+def handle_already_authorised(request, client, access_credentials):
     screenname = ''
     try:
-        client = tweepy.Client(
-            consumer_key=settings.TWITTER_CONSUMER_CREDENTIALS[0],
-            consumer_secret=settings.TWITTER_CONSUMER_CREDENTIALS[1],
-            access_token=access_credentials[0],
-            access_token_secret=access_credentials[1]
-        )
-
-        me_resp = client.get_me(user_auth=True, user_fields=['name', 'username', 'description', 'entities', 'location', 'pinned_tweet_id', 'public_metrics'],
-                tweet_fields=['entities'], expansions='pinned_tweet_id')
+        me_resp = client.get_me(user_auth=True, user_fields=['name', 'username', 'description', 'entities', 'location', 'pinned_tweet_id', 'public_metrics'], tweet_fields=['entities'], expansions='pinned_tweet_id')
         me = me_resp.data
-
+    
         if 'screenname' in request.POST:
             screenname = request.POST['screenname']
             if screenname[:1] == '@': screenname = screenname[1:]
@@ -208,14 +354,14 @@ def handle_already_authorised(request, access_credentials):
         broken_mastodon_ids = []
         requested_user_mastodon_ids = []
         requested_user_results = extract_mastodon_ids.Results()
-        extract_mastodon_ids.extract_mastodon_ids_from_users(client, requested_user_resp, requested_user_results, known_host_callback)
+        extract_mastodon_ids.extract_mastodon_ids_from_users(client, None, requested_user_resp, requested_user_results, known_host_callback)
         requested_user_mastodon_ids = requested_user_results.get_results()[0]
         if requested_user_mastodon_ids:
             requested_user_mastodon_ids = requested_user_mastodon_ids[0].mastodon_ids
             for mid in requested_user_mastodon_ids:
                 mid.query_exists()
         requested_user_results = extract_mastodon_ids.Results()
-        extract_mastodon_ids.extract_mastodon_ids_from_users(client, requested_user_resp, requested_user_results, lambda s: True)
+        extract_mastodon_ids.extract_mastodon_ids_from_users(client, None, requested_user_resp, requested_user_results, lambda s: True)
         broken_mastodon_ids = list()
         for u in requested_user_results.get_results()[0]:
             for mid in u.mastodon_ids:
@@ -228,6 +374,7 @@ def handle_already_authorised(request, access_credentials):
         followed_lists = None
         mid_results = []
         extra_results = []
+        all_results = []
         requested_lists = None
         action = None
         n_users = None
@@ -235,7 +382,12 @@ def handle_already_authorised(request, access_credentials):
         uploaded_list_errors = {}
         n_accounts_found = 0
 
-        if 'getfollowed' in request.POST:
+        if 'job_secret' in request.GET:
+            action = 'jobresults'
+            results = get_job_results(request.GET['job_secret'])
+            if results is None:
+                return show_error(request, 'This job has been deleted and is no longer available.')            
+        elif 'getfollowed' in request.POST:
             action = 'getfollowed'
             results = extract_mastodon_ids.extract_mastodon_ids_from_pseudolist(
                 client, requested_user, extract_mastodon_ids.pl_following, known_host_callback = known_host_callback)
@@ -264,14 +416,19 @@ def handle_already_authorised(request, access_credentials):
 
             list_entry = request.POST.get('list_entry')
             if list_entry is None: list_entry = ''
-            list_entry, list_entry_errors = parse_twitter_handles(TextAreaOrigin(), list_entry.splitlines())
+            try:
+                list_entry = read_archive_json(TextAreaOrigin(), list_entry)
+                list_entry_errors = []
+            except Exception as e:
+                list_entry, list_entry_errors = parse_twitter_handles(TextAreaOrigin(), list_entry.splitlines())
             
             uploaded_users = uploaded_list + list_entry
+            src = 'Direct Upload'
             
-            results, errors = extract_mastodon_ids.extract_mastodon_ids_from_users_raw(client, uploaded_users, known_host_callback = known_host_callback)
+            results, errors = extract_mastodon_ids.extract_mastodon_ids_from_users_raw(client, src, uploaded_users, known_host_callback = known_host_callback)
 
             uploaded_list_errors = uploaded_list_errors + list_entry_errors + errors
-            uploaded_list_errors.sort(key = (lambda u: u.src.line))
+            uploaded_list_errors.sort(key = (lambda u: u.src))
             uploaded_list_errors = group(uploaded_list_errors, key = (lambda x: x.src.origin))
 
         elif 'getlist' in request.POST:
@@ -304,7 +461,7 @@ def handle_already_authorised(request, access_credentials):
             increase_access_counter()
 
         if results is not None:
-            mid_results, extra_results = results.get_results()
+            mid_results, extra_results, all_results = results.get_results()
             n_users = results.n_users
 
         n_accounts_found = sum([len(u.mastodon_ids) for u in mid_results])
@@ -344,7 +501,10 @@ def handle_already_authorised(request, access_credentials):
         most_relevant_instances = list()
         for inst, us in mastodon_ids_by_instance.items():
             if inst.users is None or len(us) <= 2: continue
-            inst.score = 1 / (2 - math.log(len(us) / inst.users) * math.log(inst.users)) * 1000
+            try:
+                inst.score = 1 / (2 - math.log(len(us) / inst.users) * math.log(inst.users)) * 1000
+            except:
+                continue
             most_relevant_instances.append(inst)
         most_relevant_instances.sort(key = (lambda inst: inst.score), reverse = True)
         n_most_relevant = 20
@@ -378,6 +538,7 @@ def handle_already_authorised(request, access_credentials):
             'me' : me,
             'is_me': is_me,
             'csv': make_csv(mid_results),
+            'full_csv': make_full_csv(all_results),
             'lists': lists,
             'followed_lists': followed_lists
         }
@@ -460,13 +621,21 @@ def profile(request):
     user = extract_mastodon_ids.MastodonID(request.GET['user'], request.GET['host'])
     url = user.profile_url()
     if url is None:
-        print('URL was None!')
         url = f'https://{user.host_part}/@{user.user_part}'
     return redirect(url)
 
-@gzip_page
-@csrf_protect
-def index(request):
+
+
+def wrap_auth(request, callback):
+    def go(access_credentials):
+        client = tweepy.Client(
+            consumer_key=settings.TWITTER_CONSUMER_CREDENTIALS[0],
+            consumer_secret=settings.TWITTER_CONSUMER_CREDENTIALS[1],
+            access_token=access_credentials[0],
+            access_token_secret=access_credentials[1]
+        )
+        return callback(request, client, access_credentials)
+
     # clear the credentials cookie if the users requests it
     if 'clear' in request.GET:
         response = handle_auth_request(request)
@@ -477,7 +646,7 @@ def index(request):
     twitter_credentials = try_get_twitter_credentials(request)
     if twitter_credentials is not None:
         try:
-            return handle_already_authorised(request, twitter_credentials)
+            return go(twitter_credentials)
         except TweepyException as e:
             pass
     
@@ -486,19 +655,92 @@ def index(request):
         request_token = request.GET['oauth_token']
         request_secret = request.GET['oauth_verifier']
         
-        oauth1_user_handler = mk_oauth1()
-        oauth1_user_handler.request_token = {
+        oauth1 = mk_oauth1()
+        oauth1.request_token = {
           'oauth_token': request_token,
           'oauth_token_secret': request_secret
         }
 
         try:
-            access_token, access_token_secret = oauth1_user_handler.get_access_token(request_secret)
-            return handle_already_authorised(request, (access_token, access_token_secret))
+            access_token, access_token_secret = oauth1.get_access_token(request_secret)
+            return go((access_token, access_token_secret))
         except TweepyException as e:
             print(e)
             return handle_auth_request(request)
 
     else:
         return handle_auth_request(request)
+
+
+def batch_aborted_message(job):
+    return f'Your batch job ‘{job.name}’ (#{job.id}) was aborted for unknown reasons. Please try again and contact the administrator if this happens a second time.'
+    
+def batch_still_running_message(job):
+    return f'You still have a batch job ‘{job.name}’ (#{job.id}) running. Wait for it to complete or abort it before submitting a new one.'
+
+def batch_launched_message(job):
+    return f'Your job ‘{job.name}’ (#{job.id}) was launched successfully. You can monitor the progress by refreshing this page.'
+
+def batch_aborted_by_request_message(job):
+    if job is None:
+        return 'There is no job to be aborted.'
+    else:
+        return f'Your job ‘{job.name}’ (#{job.id}) was aborted.'
+
+batch_list_empty_message = 'The list you uploaded contained no valid Twitter user names or IDs, so no job was launched.'
+
+def format_access_credentials(access_credentials):
+    return access_credentials[0] + ':' + access_credentials[1]
+
+def handle_batch(request, client, access_credentials):
+    me_resp = client.get_me(user_auth=True)
+    me = me_resp.data
+    job = batchtools.get(me.id)
+    
+    if 'abort' in request.POST:
+        batchtools.delete_all(me.id)
+        return render(request, "batch_submit.html", {'me': me, 'message': batch_aborted_by_request_message(job)})
+    
+    if 'submit' in request.POST:
+        if job is not None and not job.aborted and not job.completed:
+            return render(request, "batch_progress.html", {'job': job, 'me': me, 'message': batch_still_running_message(job)})
+        batchtools.delete_all(me.id)
+        name = None
+        if 'job_name' in request.POST:
+            name = request.POST['job_name']
+        if not name: name = '<untitled>'
+        requested_users, errors = read_uploaded_lists(request)
+        if requested_users:
+            job = batchtools.launch(uid = me.id, name = name, requested_users = requested_users, access_credentials = format_access_credentials(access_credentials))
+            return redirect('./batch')
+            #return render(request, "batch_progress.html", {'job': job, 'me': me, 'message': batch_launched_message(job), 'uploaded_list_errors': errors})
+        else:
+            return render(request, "batch_submit.html", {'me': me, 'message': batch_list_empty_message, 'uploaded_list_errors': errors})
+    
+    if job is None:
+        return render(request, "batch_submit.html", {'me': me})
+    if job.running or job.aborted or job.completed:
+        return render(request, "batch_progress.html", {'me': me, 'job': job})
+    return render(request, "batch_submit.html", {'me': me})
+
+@gzip_page
+@csrf_protect
+def batch(request):
+    return wrap_auth(request, handle_batch)
+    
+def batch_progress(request):
+    if 'job_secret' not in request.GET:
+        raise PermissionDenied
+    with connection.cursor() as cur:
+        cur.execute('SELECT progress, time_completed FROM batch_jobs WHERE text_id=%s LIMIT 1', [request.GET['job_secret']])
+        progress, time_completed = cur.fetchone()
+        if time_completed is not None:
+            time_completed = time_completed.isoformat()
+        return JsonResponse({'progress': progress, 'completed': time_completed})
+
+@gzip_page
+@csrf_protect
+def index(request):
+    return wrap_auth(request, handle_already_authorised)
+
 

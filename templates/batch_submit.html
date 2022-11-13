@@ -1,0 +1,39 @@
+{% include "header.html" %}
+
+<p>Logged in as: @{{ me.username }}</p>
+
+{% if message %}
+<p>{{ message }}</p>
+{% endif %}
+
+{% if uploaded_list_errors %}
+  <div style="border: 1px solid #a33; border-radius: 1em; padding-left: 1em; padding-right: 1em; padding-top: 0.2em; padding-bottom: 0.2em; background-color: #fbb">
+  <p style="font-weight: bold; margin-bottom: 0; margin-top: 0.4em;">File Processing Error</p>
+  <hr style="border: 1px solid #a33">
+  <p>Your uploaded lists contained Twitter handles/IDs that are invalid or do not exist.</p>
+  <dl>
+  {% for origin, errs in uploaded_list_errors %}
+    <dt style="margin-top: 0.8em">{% if origin.is_text_area %}Form input{% else %}Uploaded file <tt>{{ origin.name }}</tt>{% endif %}:</dt>
+    <dd>
+    {% for u in errs|slice:":20" %}
+      <li>{{ u.src.short }}: {% if u.src.original_form %}<tt>{{ u.src.original_form }}</tt>{% endif %}</li>
+    {% endfor %}
+    {% if errs|length > 20 %}
+      <li>…</li>
+    {% endif %}
+    </dd>
+  {% endfor %}
+  </dl>
+  </div>
+{% endif %}
+
+<p>You can upload one or more large files to be processed in the background. Afterwards, you can monitor the progress of your job and view the results when it is done.</p>
+<form action="./batch" enctype="multipart/form-data" method="post">
+{% csrf_token %}
+<p><label for="job_name" style="margin-right: 0.5em">Job name:</label> <input type="text" id="job_name" name="job_name" placeholder="&lt;untitled&gt;"></p>
+<p><input type="file" id="uploaded_list" name="uploaded_list" multiple></p>
+<p><input type="submit" name="submit" value="Submit" style=""></p>
+</form>
+
+{% include "footer.html" %}
+</html>

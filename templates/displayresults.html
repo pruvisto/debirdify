@@ -68,14 +68,17 @@
   <div style="border: 1px solid #a33; border-radius: 1em; padding-left: 1em; padding-right: 1em; padding-top: 0.2em; padding-bottom: 0.2em; background-color: #fbb">
   <p style="font-weight: bold; margin-bottom: 0; margin-top: 0.4em;">File Processing Error</p>
   <hr style="border: 1px solid #a33">
-  <p>Your uploaded lists contained Twitter handles that are invalid or do not exist.</p>
+  <p>Your uploaded lists contained Twitter handles/IDs that are invalid or do not exist.</p>
   <dl>
   {% for origin, errs in uploaded_list_errors %}
     <dt style="margin-top: 0.8em">{% if origin.is_text_area %}Form input{% else %}Uploaded file <tt>{{ origin.name }}</tt>{% endif %}:</dt>
     <dd>
-    {% for u in errs %}
-      <li>line {{ u.src.line }}: <tt>{{ u.src.original_form }}</tt></li>
+    {% for u in errs|slice:":20" %}
+      <li>{{ u.src.short }}: {% if u.src.original_form %}<tt>{{ u.src.original_form }}</tt>{% endif %}</li>
     {% endfor %}
+    {% if errs|length > 20 %}
+      <li>…</li>
+    {% endif %}
     </dd>
   {% endfor %}
   </dl>
@@ -109,7 +112,7 @@
                 you blocked
 			{% elif action == 'getmuted' %}
                 you muted
-			{% elif action == 'listupload' %}
+			{% elif action == 'listupload' or action == 'jobresults' %}
 			    in the list you uploaded
 		    {% else %}
 				in the selected lists
@@ -260,10 +263,10 @@ mkChart('service_distribution', 'service_distribution_container', 'Service Distr
   {% endfor %}
 </ul>
 
-<h2>CSV Export</h2>
+<h2>Export</h2>
 <p><a id="export"></a>You can bulk-follow, bulk-block, etc. all the above accounts on Fediverse by downloading the CSV file below and importing it e.g. on Mastodon under Settings → Import and Export → Import. Make sure to select ‘merge’, not ‘overwrite’.</p>
-<p style="margin-bottom: 2em">
-<a class="button" href="data:text/plain;charset=utf-8,{{ csv|urlencode }}"
+<p>You can also get a list of all users that were searched in order to e.g. get a list of all the accounts you follow on Twitter (including ones that do not have a Mastodon account yet)</p>
+<a class="button" style="display: block; text-align: center; float: left; margin-top: 0.3em;" href="data:text/plain;charset=utf-8,{{ csv|urlencode }}"
   {% if action == 'getfollowed' %}
      download="following_accounts.csv"
   {% elif action == 'getfollowers' %}
@@ -277,11 +280,28 @@ mkChart('service_distribution', 'service_distribution_container', 'Service Distr
   {% else %}
      download="accounts.csv"
   {% endif %}  
->Download CSV Export</a>
-</p>
-
-
+>Download CSV Export<br><span style="font-size: 60%">for Mastodon Import</span></a>
 {% endif %}
+
+{% if action != 'getlists' %}
+<a class="button" style="display: block; text-align: center; clear: both; float: left; margin-top: 0.3em" href="data:text/plain;charset=utf-8,{{ full_csv|urlencode }}"
+  {% if action == 'getfollowed' %}
+     download="following_accounts.csv"
+  {% elif action == 'getfollowers' %}
+     download="followers_accounts.csv"
+  {% elif action == 'getblocked' %}
+     download="blocked_accounts.csv"
+  {% elif action == 'getmuted' %}
+     download="muted_accounts.csv"
+  {% elif action == 'getlists' %}
+     download="list_accounts.csv"
+  {% else %}
+     download="accounts.csv"
+  {% endif %}  
+>Download Full Export<br><span style="font-size: 60%">not for Mastodon import</span></a>
+{% endif %}
+
+<div style="clear:both; margin-top: 1em"></div>
 
 {% if keyword_users %}
 <h2>Additional Spurious Results</h2>
@@ -305,12 +325,10 @@ mkChart('service_distribution', 'service_distribution_container', 'Service Distr
 
 {% endif %}
 
-<p style="margin-bottom: 2em; margin-top: 2em;">
-<a class="button" href="./?clear=clear">Log Out</a>
-</p>
+<a class="button" style="display: block; text-align: center; float: left; clear: left; margin-top: 1em;" href="./?clear=clear">Log Out</a>
+<div style="clear:both"></div>
 
-
-<h2 id="upload_custom_section">Upload Custom List</h2>
+<h2 id="upload_custom_section" style="margin-top: 1em">Upload Custom List</h2>
 <p>Instead of scanning a list from Twitter (followers, blocked accounts, etc.) you can also directly enter or upload a list of accounts to scan. The expected format is one Twitter user name per line, with or without a leading <tt>@</tt>. Note that usernames must contain only valid characters (<tt>A-Za-z0-9_</tt>) and have a length of 3–15 characters.</p>
 <form action="./" enctype="multipart/form-data" method="post">
 {% csrf_token %}
