@@ -122,7 +122,6 @@ def mk_oauth1():
     )
     
 def handle_auth_request(request):
-    print(settings.TWITTER_CALLBACK_URL)
     oauth1 = mk_oauth1()
     auth_url = oauth1.get_authorization_url()
     return render(request, "auth.html", {'auth_url': auth_url})
@@ -236,11 +235,8 @@ def read_archive_json(origin, s):
         m = _archive_json_pat.match(s)
         if m is not None:
             s = m[1]
-        print(s[:200])
         json_dat = json.loads(s)
         results = parse_archive_json(origin, json_dat)
-        for u in results:
-            print(u)
         return results
     except Exception as e:
         raise e
