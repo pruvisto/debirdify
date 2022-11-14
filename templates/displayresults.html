@@ -48,6 +48,7 @@
         <li class="mids"><a href="./profile?user={{ mid.user_part|urlencode }}&host={{ mid.host_part|urlencode }}">{{ mid }}</a>&nbsp;
         {% if mid.exists == 'forbidden' %}❓<br>This server blocks our request. Consider contacting the server admins about it.
         {% elif mid.exists == True %}✔️
+        {% elif mid.exists == 'broken' %}❌<br>The server appears to be misconfigured or otherwise broken.
         {% elif mid.exists == False %}❌<br>This account does not exist. Do you perhaps have a typo?
         {% elif mid.exists == 'error' %}❌<br>This server does not exist or responds too slowly.
         {% else %}❌<br>The server responded in a way we cannot interpret.{% endif %}</li>

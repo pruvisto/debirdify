@@ -194,10 +194,12 @@ class MastodonID:
         webfinger_url = self.webfinger_template().replace('{uri}', str(self))
         try:
             resp = requests.head(webfinger_url, timeout=2, allow_redirects=True)
-            if resp.status_code == 404:
+            if resp.status_code == 404 or resp.status_code == 410:
                 self.exists = False
-            elif resp.status_code == 403:
+            elif resp.status_code == 403 or resp.status_code == 401:
                 self.exists = 'forbidden'
+            elif resp.status_code >= 500 and resp.status_code < 600:
+                self.exists = 'broken'
             elif resp.status_code == 200:
                 self.exists = True
             else:
