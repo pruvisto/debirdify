@@ -43,6 +43,6 @@ Note that if you use this software you will have to get a Twitter developer acco
 
 ### Contact
 
-If you have any questions or suggestions, contact [https://graz.social/@pruvisto](@pruvisto@graz.social). Pull requests are welcome, but I may be too busy to put too much work into this project. Forks/other instances of this are also very welcome.
+If you have any questions or suggestions, contact [@pruvisto@graz.social](https://graz.social/@pruvisto). Pull requests are welcome, but I may be too busy to put too much work into this project. Forks/other instances of this are also very welcome.
 
 
