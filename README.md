@@ -13,12 +13,23 @@ An experimental canonical instance of this is hosted on https://pruvisto.org/deb
 
 ### Implementation
 
-This project uses Django and Python. Configuration of things like the callback URL and API keys and secrets is done with WSGI environment variables (set them e.g. with SetVar in your webserver configuration).
+This project uses Django and Python. Configuration of things like the callback URL and API keys and secrets is done with WSGI environment variables.
 
 The Twitter authentication information is stored in a cookie for 7 days so that users do not have to re-authenticate every time they revisit the website.
 
 The logical core of the implementation is in `main/extract_mastodon_ids.py`. Using this, you can also create a standalone application to find Mastodon IDs in account bios/names.
 
+### Installation
+
+Install `postgresql`, `libpq-dev`, `python3`, and `python3-pip`.
+Then run
+```
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+TODO: database setup
 
 ### Configuration
 
@@ -29,6 +40,12 @@ Environment variables being used are:
   - `DEBIRDIFY_CALLBACK_URL`: the callback URL to be used by the Twitter auth
   - `DEBIRDIFY_DEBUG` (0 or 1): whether Django should run in debug mode (absolutely switch this off for production use)
 
+In Apache, you can, for example, set them using `SetVar` in your webserver configuration.
+For Nginx, you can, for example, set them by using uWSGI, adding the environment variables in an uWSGI init file.
+
+### Running
+
+Set up a webserver and WSGI, pointing to `debirdify.wsgi`.
 
 ### Caveats
 
