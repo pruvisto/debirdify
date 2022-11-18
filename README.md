@@ -21,15 +21,19 @@ The logical core of the implementation is in `main/extract_mastodon_ids.py`. Usi
 
 ### Installation
 
-Install `postgresql`, `libpq-dev`, `python3`, and `python3-pip`.
+Install `postgresql`, `libpq-dev`, `python3` (version >=3.9), `python3-pip`, and `python3-venv`.
 Then run
 ```
 python3 -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip3 install -r requirements.txt
 ```
 
-TODO: database setup
+### Database
+
+Create a new database user `debirdify`, a database `debirdify` while also granting all privileges to the user `debirdify`.
+
+TODO: initialisation of database
 
 ### Configuration
 
