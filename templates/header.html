@@ -6,10 +6,10 @@
 <meta name="description" content="This is a web app that helps you find out which of the people you follow on Twitter are on Mastodon/in the Fediverse already and follow all of them easily.">
 <meta name="author" content="Manuel Eberl">
 <title>Debirdify</title>
-<link rel="icon" type="image/svg+xml" href="https://pruvisto.org/debirdify_static/logo.svgz">
-<link rel="stylesheet" href="https://pruvisto.org/debirdify_static/style.css">
+<link rel="icon" type="image/svg+xml" href="/debirdify_static/logo.svgz">
+<link rel="stylesheet" href="/debirdify_static/style.css">
 <link rel="me" href="https://digitalcourage.social/@debirdify">
-<script src="https://pruvisto.org/debirdify_static/chart.min.js"></script>
+<script src="/debirdify_static/chart.min.js"></script>
 <script>
 function mkChart(id, container_id, title, labels, vals, click_callback, mk_label) {
     const div = document.getElementById(container_id)
@@ -45,7 +45,7 @@ function mkChart(id, container_id, title, labels, vals, click_callback, mk_label
         borderWidth: 1
       }]
     };
-    
+
     const myChart = new Chart(canvas.id, {
       type: "doughnut",
       data: data,
@@ -62,7 +62,7 @@ function mkChart(id, container_id, title, labels, vals, click_callback, mk_label
                       labelColor: function(context) {
                         return {borderWidth: 0, backgroundColor: colors[context.dataIndex], borderColor: colors[context.dataIndex]};
                         },
-                      label: 
+                      label:
                           function(context) {
                               const i = context.dataIndex;
                               if (i < 0 || i >= n) return null;
@@ -135,5 +135,5 @@ function mkChart(id, container_id, title, labels, vals, click_callback, mk_label
 </script>
 </head>
 <body>
-<h1><a href="https://pruvisto.org/debirdify_static/logo.svgz"><img src="https://pruvisto.org/debirdify_static/logo.svgz" style="width: 44pt; vertical-align: text-bottom; padding-right: 3pt;" alt="The Debirdify logo"></a>Debirdify</h1>
+<h1><a href="/debirdify_static/logo.svgz"><img src="/debirdify_static/logo.svgz" style="width: 44pt; vertical-align: text-bottom; padding-right: 3pt;" alt="The Debirdify logo"></a>Debirdify</h1>
 
