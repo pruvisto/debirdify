@@ -45,7 +45,7 @@ For Nginx, you can, for example, set them by using uWSGI, adding the environment
 
 ### Running
 
-Set up a webserver and WSGI, pointing to `debirdify.wsgi`.
+Set up a webserver and WSGI, pointing to `debirdify/wsgi`.
 
 ### Caveats
 
