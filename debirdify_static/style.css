@@ -1,0 +1,75 @@
+body {
+  font-family: 'sans-serif';
+  max-width: 60em;
+  text-align: justify;
+  padding-top: 0;
+}
+h1 {
+  font-size: 32pt;
+  margin-top: 10pt;
+  margin-bottom: 16pt;
+}
+h2 {
+  font-size: 16pt;
+  margin-top: 1em;
+  margin-bottom: 0.2em;
+}
+h3 {
+  font-size: 12pt;
+}
+a.button {
+    border: 1px solid #101357;
+    background-color: #88f;
+    font-weight: bold;
+    font-size: 16pt;
+    padding: 0.5em;
+    color: black;
+    text-decoration: none;
+}
+.displayname {
+    font-weight: 700;
+}
+.screenname::before {
+    content: "@";
+}
+.screenname {
+    color: rgb(83, 100, 113);
+}
+a.twitter_acc_link {
+    text-decoration: none;
+    color: inherit;
+}
+dl.users {
+  margin-left: 1em;
+}
+dd.users {
+  margin-bottom: 1em;
+}
+ul.mids {
+  list-style-type: none;
+  text-indent: 0;
+  padding: 0;
+}
+ul.extras {
+  list-style-type: none;
+  text-indent: 0;
+  padding: 0;
+}
+ol.mids {
+  text-indent: 0;
+  padding: 0;
+}
+ol.extras {
+  text-indent: 0;
+  padding: 0;
+}
+ul.lists {
+  list-style-type: none;
+  padding-left: 1em;
+}
+ol.lists {
+  padding-left: 1em;
+}
+img.server_icon {
+  margin-left: 2pt;
+}

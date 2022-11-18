@@ -246,19 +246,19 @@ mkChart('service_distribution', 'service_distribution_container', 'Service Distr
   {% spaceless %}
   <li style="border-radius: 1em; padding: 0.8em; padding-bottom: 0; margin-left: 0; margin-bottom: 1em; border: 1px solid #333">
   <a id="instance_{{ forloop.counter }}"></a>
-  {% if i.icon %}<img src="https://pruvisto.org/debirdify_static/service_icons/{{ i.icon }}" title="{{i.software|title}}" alt="{{i.software|title}}" style="height: 2.5ex; margin-right: 2pt; vertical-align: baseline" class="server_icon">
+  {% if i.icon %}<img src="/debirdify_static/service_icons/{{ i.icon }}" title="{{i.software|title}}" alt="{{i.software|title}}" style="height: 2.5ex; margin-right: 2pt; vertical-align: baseline" class="server_icon">
   {% else %}
-  <img src="https://pruvisto.org/debirdify_static/service_icons/unknown.svg" title="Unknown service" alt="Unknown service" style="height: 2.5ex; margin-right: 2pt" class="server_icon">
+  <img src="/debirdify_static/service_icons/unknown.svg" title="Unknown service" alt="Unknown service" style="height: 2.5ex; margin-right: 2pt" class="server_icon">
   {% endif %}
   <span style="font-weight: bold; font-size: 140%;">
   <a style="margin-right: 2pt; text-decoration: none; color: inherit" href="https://{{ i.host|urlencode }}" target="_blank">{{ i.host }}</a>
   
   {% if i.dead %}
-  <img src="https://pruvisto.org/debirdify_static/dead.svg" title="offline or very slow" alt="offline or very slow" class="server_icon" style="height: 1.5ex">
+  <img src="/debirdify_static/dead.svg" title="offline or very slow" alt="offline or very slow" class="server_icon" style="height: 1.5ex">
   {% elif i.registrations_open is not none and not i.registrations_open %}
-  <img src="https://pruvisto.org/debirdify_static/lock.svg" title="not open for registrations" title="not open for registrations" class="server_icon" style="height: 1.5ex">
+  <img src="/debirdify_static/lock.svg" title="not open for registrations" title="not open for registrations" class="server_icon" style="height: 1.5ex">
   {% elif i.registrations_open %}
-  <img src="https://pruvisto.org/debirdify_static/open.svg" title="open for registrations" title="open for registrations" class="server_icon" style="height: 1.6ex">
+  <img src="/debirdify_static/open.svg" title="open for registrations" title="open for registrations" class="server_icon" style="height: 1.6ex">
   {% endif %}  
   </span>
   
