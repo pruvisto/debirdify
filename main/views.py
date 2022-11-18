@@ -147,12 +147,11 @@ def make_full_csv(users):
         return f.getvalue()
 
 def increase_access_counter():
-    pass
-#    try:
-#        with connection.cursor() as cur:
-#            cur.execute("INSERT INTO access_stats (date, count) VALUES (DATE('now'), 1) ON CONFLICT DO UPDATE SET count = count + 1")
-#    except Exception as e:
-#        print('Failed to increase access counter:', e)
+    try:
+        with connection.cursor() as cur:
+            cur.execute("INSERT INTO access_stats (date, count) VALUES (DATE('now'), 1) ON CONFLICT (date) DO UPDATE SET count = access_stats.count + 1")
+    except Exception as e:
+        print('Failed to increase access counter:', e)
 
 class FileUploadError(Exception):
     pass
