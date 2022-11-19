@@ -351,7 +351,7 @@ def handle_already_authorised(request, client, access_credentials):
         def known_host_callback(s):
             try:
                 with connection.cursor() as cur:
-                    cur.execute('SELECT name FROM instances WHERE name=%s LIMIT 1', [s])
+                    cur.execute('SELECT name, software FROM instances WHERE name=%s LIMIT 1', [s])
                     row = cur.fetchone()
                     if row is None:
                         try:
@@ -359,7 +359,7 @@ def handle_already_authorised(request, client, access_credentials):
                         except:
                             pass
                     else:
-                        return True
+                        return (software is not None)
             except Exception as e:
                 return False
 
