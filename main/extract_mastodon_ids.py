@@ -176,7 +176,7 @@ class MastodonID:
         if webfinger_template is None:
             try:
                 url = f'https://{self.host_part}/.well-known/host-meta'
-                resp = requests.get(url, allow_redirects=True, headers = {'Accept': 'application/xrd+xml'})
+                resp = requests.get(url, allow_redirects=True, headers = {'Accept': 'application/xrd+xml'}, timeout=5)
                 if resp.status_code == 200:
                     t = ElementTree.fromstring(resp.content, forbid_dtd = True)
                     if re.match('^(\{[^{}]*\})?XRD$', t.tag) is not None:
