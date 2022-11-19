@@ -359,7 +359,7 @@ def handle_already_authorised(request, client, access_credentials):
                         except:
                             pass
                     else:
-                        return (software is not None)
+                        return (row['software'] is not None)
             except Exception as e:
                 return False
 
