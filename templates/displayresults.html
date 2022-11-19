@@ -259,6 +259,9 @@ mkChart('service_distribution', 'service_distribution_container', 'Service Distr
   <img src="/debirdify_static/lock.svg" title="not open for registrations" title="not open for registrations" class="server_icon" style="height: 1.5ex">
   {% elif i.registrations_open %}
   <img src="/debirdify_static/open.svg" title="open for registrations" title="open for registrations" class="server_icon" style="height: 1.6ex">
+  {% endif %}
+  {% if i.country is not none %}
+  <span title="Server location: {{ i.country.name }}" style="margin-left: 4pt;">{{ i.country.flag }}</span>
   {% endif %}  
   </span>
   
