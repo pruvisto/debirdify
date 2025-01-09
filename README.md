@@ -1,4 +1,5 @@
 # Debirdify
+
 ## Find out which of your Twitter followers have a Mastodon account
 
 This is a simple (and experimental) web app that uses the Twitter API to find out which people you follow and searches their names and bios for things that look like Mastodon IDs, and, if that fails, checks if there are any seemingly Mastodon-related keywords in their bios.
@@ -8,7 +9,10 @@ A CSV export for import into Mastodon is also provided.
 
 ### Canonical instance
 
-An experimental canonical instance of this is hosted on https://pruvisto.org/debirdify.
+An experimental canonical instance of this *was* hosted on https://pruvisto.org/debirdify.
+This instance no longer works since Twitter blocked my API access due to supposed terms-of-service violations, without every clarifying what parts of the terms of service I allegedly violated and not responding to support requests regarding the matter.
+
+Since unpaid API access no longer exists, the entire project is probably no longer relevant.
 
 
 ### Implementation
